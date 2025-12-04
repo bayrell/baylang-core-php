@@ -1,0 +1,23 @@
+{
+    "name": "baylang/core",
+    "description": "BayLang core for PHP",
+    "type": "library",
+    "license": "Apache-2.0",
+    "version": "1.0.0",
+    "authors": [
+        {
+            "name": "Ildar Bikmamatov",
+            "email": "ildar@bayrell.org"
+        }
+    ],
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "Runtime\\": "src/Runtime",
+            "Runtime\\Console\\": "src/Runtime.Console",
+            "Runtime\\Unit\\": "src/Runtime.Unit",
+            "Runtime\\Web\\": "src/Runtime.Web",
+            "Runtime\\Widget\\": "src/Runtime.Widget"
+        }
+    }
+}

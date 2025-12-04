@@ -1,0 +1,390 @@
+<?php
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+namespace Runtime;
+
+use Runtime\Exceptions\IndexOutOfRange;
+
+class Vector implements \ArrayAccess, \JsonSerializable, \IteratorAggregate
+{
+	var $_arr = [];
+	
+	
+	/**
+	 * Create vector
+	 */
+	static function create($arr)
+	{
+		$res = new static();
+		$res->_arr = $arr;
+		return $res;
+	}
+	
+	
+	/**
+	 * Returns array
+	 */
+	function toArray()
+	{
+		return $this->_arr;
+	}
+	
+	
+	/**
+	 * Constructor
+	 */
+	function __construct()
+	{
+		$this->_arr = func_get_args();
+	}
+	
+	
+	/**
+	 * Returns value from position
+	 * @param int pos - position
+	 */
+	function get($pos, $default_value = null)
+	{
+		return ($pos >= 0 && $pos < count($this->_arr)) ? $this->_arr[$pos] : $default_value;
+	}
+	
+	
+	/**
+	 * Set value to position
+	 * @param int pos - position
+	 * @param T value 
+	 */
+	function set($pos, $value)
+	{
+		if ($pos >= 0 && $pos < count($this->_arr))
+		{
+			$this->_arr[$pos] = $value;
+		}
+	}
+	
+	
+	/**
+	 * Insert first value size_to array
+	 * @return T value
+	 */
+	function insert($pos, $value)
+	{
+		array_splice($this->_arr, $pos, 0, [$value]);
+	}
+	
+	
+	/**
+	 * Remove item from array
+	 */
+	function remove($pos)
+	{
+		array_splice($this->_arr, $pos, 1);
+	}
+	
+	
+	/**
+	 * Append value to the end of array
+	 * @param T value
+	 */
+	function push($value)
+	{
+		array_push($this->_arr, $value);
+	}
+	
+	
+	/**
+	 * Array pop
+	 */
+	function pop()
+	{
+		return array_pop($this->_arr);
+	}
+	
+	
+	/**
+	 * Flatten Vector
+	 */
+	function flatten()
+	{
+		$res = new Vector();
+		foreach ($this->_arr as $item)
+		{
+			if ($item instanceof Vector)
+			{
+				array_splice($res->_arr, $res->count(), 0, $item->flatten()->_arr);
+			}
+			else
+			{
+				$res->push($item);
+			}
+		}
+		return $res;
+	}
+	
+	
+	/**
+	 * Find value in array. Returns -1 if value not found.
+	 * @param T value
+	 * @return  int
+	 */
+	function indexOf($value)
+	{
+		$pos = array_search($value, $this->_arr, true);
+		if ($pos === false) return -1;
+		return $pos;
+	}
+	
+	
+	/**
+	 * Find item
+	 * @param fn f - Find function
+	 * @return item
+	 */
+	function find($f)
+	{
+		$index = $this->findIndex($f);
+		if ($index === -1) return null;
+		return $this[$index];
+	}
+	
+	
+	/**
+	 * Find item pos
+	 * @param fn f - Find function
+	 * @return int - position
+	 */
+	function findIndex($f)
+	{
+		foreach ($this->_arr as $key => $value)
+		{
+			if ($f($value, $key, $this)) return $key;
+		}
+		return -1;
+	}
+	
+	
+	/**
+	 * Get first item
+	 */
+	function first($default_value = null)
+	{
+		if ($this->count() == 0) return $default_value;
+		return $this->_arr[0];
+	}
+	
+	
+	/**
+	 * Get last item
+	 */
+	function last($default_value = null)
+	{
+		$count = $this->count();
+		if ($count == 0) return $default_value;
+		return $this->_arr[$count - 1];
+	}
+	
+	
+	/**
+	 * Map
+	 * @param fn f
+	 * @return Vector
+	 */
+	function map($f)
+	{
+		$res = new static();
+		$res->_arr = array_map(function($item, $index) use ($f){
+			return $f($item, $index, $this);
+		}, $this->_arr, array_keys($this->_arr));
+		return $res;
+	}
+	
+	
+	/**
+	 * Reduce
+	 * @param fn f
+	 * @param var value
+	 * @return value
+	 */
+	function reduce($f, $value)
+	{
+		foreach ($this->_arr as $key => $item)
+		{
+			$value = $f($value, $item, $key, $this);
+		}
+		return $value;
+	}
+	
+	
+	/**
+	 * Filter items
+	 * @param fn f
+	 * @return Vector
+	 */
+	function filter($f)
+	{
+		$res = new static();
+		$res->_arr = array_values(array_filter($this->_arr, function($value, $key) use ($f){
+			return $f($value, $key, $this);
+		}, ARRAY_FILTER_USE_BOTH));
+		return $res;
+	}
+	
+	
+	/**
+	 * Call function for each item
+	 * @param fn f
+	 */
+	function each($f)
+	{
+		foreach ($this->_arr as $key => $value)
+		{
+			$f($value, $key, $this);
+		}
+	}
+	
+	
+	/**
+	 * Transition Collection to Dict
+	 * @param fn f
+	 * @return Dict
+	 */
+	function transition($f = null)
+	{
+		$map = new \Runtime\Map();
+		foreach ($this->_arr as $key => $value)
+		{
+			if ($f) $res = $f($value, $key, $this);
+			else $res = [$value, $key];
+			$map->set($res[1], $res[0]);
+		}
+		return $map;
+	}
+	
+	
+	/**
+	 * Append vector to the end of the vector
+	 * @param Collection<T> arr
+	 */
+	function concat($arr)
+	{
+		$res = new static();
+		$res->_arr = array_merge($this->_arr, $arr->_arr);
+		return $res;
+	}
+	
+	
+	/**
+	 * Append items
+	 */
+	function appendItems($arr)
+	{
+		$this->_arr = array_merge($this->_arr, $arr->_arr);
+	}
+	
+	
+	/**
+	 * Returns count items in vector
+	 */
+	function count()
+	{
+		return count($this->_arr);
+	}
+	
+	
+	/**
+	 * Returns new Collection
+	 * @param int offset
+	 * @param int length
+	 * @return Collection<T>
+	 */
+	function slice($offset = 0, $length = null)
+	{
+		if ($length == null) $length = $this->count() - $offset;
+		$res = new static();
+		$res->_arr = array_slice($this->_arr, $offset, $length);
+		return $res;
+	}
+	
+	
+	/**
+	 * Sort Collection
+	 * @param fn f - Sort user function
+	 */
+	function sort($f = null)
+	{
+		if ($f) usort($this->_arr, $f);
+		else sort($this->_arr);
+		return $this;
+	}
+	
+	
+	/**
+	 * Reverse Collection
+	 */
+	function reverse()
+	{
+		$this->_arr = array_reverse($this->_arr);
+	}
+	
+	
+	/**
+	 * Remove dublicate values
+	 */
+	function removeDuplicates()
+	{
+		$res = new static();
+		for ($i=0; $i<$this->count(); $i++)
+		{
+			$pos = array_search($this[$i], $res->_arr, true);
+			if ($pos === false)
+			{
+				$res->_arr[] = $this[$i];
+			}
+		}
+		return $res;
+	}
+	
+	
+	/**
+	 * Json Serialize
+	 */
+	function jsonSerialize() : mixed
+	{
+		return $this->_arr;
+	}
+	
+	
+	/**
+	 * Returns iterator
+	 */
+	function getIterator(): \Traversable
+	{
+		return new \ArrayIterator($this->_arr);
+	}
+	
+	
+	/**
+	 * Get and set methods
+	 */
+	function offsetExists(mixed $k): bool{return isset($this->_arr[$k]);}
+	function offsetGet(mixed $k): mixed{return $this->get($k);}
+	function offsetSet(mixed $k, mixed $v): void{$this->set($k, $v);}
+	function offsetUnset(mixed $k): void{
+		throw new \Runtime\Exceptions\RuntimeException("Can't to remove item");
+	}
+}

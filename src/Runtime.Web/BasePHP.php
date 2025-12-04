@@ -1,0 +1,311 @@
+<?php
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+namespace Runtime\Web;
+
+use Runtime\BaseObject;
+use Runtime\BaseProvider;
+use Runtime\Callback;
+use Runtime\Hooks\RuntimeHook;
+use Runtime\Web\BaseLayoutModel;
+use Runtime\Web\BaseRoute;
+use Runtime\Web\Layout;
+use Runtime\Web\RenderContainer;
+use Runtime\Web\Request;
+use Runtime\Web\RouteInfo;
+use Runtime\Web\RouteList;
+use Runtime\Web\Hooks\AppHook;
+
+
+class BasePHP extends \Runtime\BaseProvider
+{
+	/**
+	 * Create render container
+	 */
+	function createRenderContainer()
+	{
+		$container = new \Runtime\Web\RenderContainer();
+		/* Create layout */
+		\Runtime\rtl::getContext()->hook(\Runtime\Hooks\RuntimeHook::CREATE_CONTAINER, new \Runtime\Map([
+			"container" => $container,
+		]));
+		return $container;
+	}
+	
+	
+	/**
+	 * Read post
+	 */
+	function readPost()
+	{
+		$post = null;
+		$method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : "";
+		$content_type = isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : "";
+		if (substr($content_type, 0, strlen('application/json')) == 'application/json')
+		{
+			$json = file_get_contents("php://input");
+			$post = \Runtime\rtl::json_decode($json);
+		}
+		else
+		{
+			if ($method == "POST")
+			{
+				$post = $_POST;
+			}
+		}
+		return $post;
+	}
+	
+	
+	/**
+	 * Build files
+	 */
+	function buildFiles($payload, $path, $file)
+	{
+		if (is_string($file["name"]))
+		{
+			$item = new \Runtime\File([
+				"name" => $file["name"],
+				"path" => $file["tmp_name"],
+				"type" => $file["type"],
+				"size" => $file["size"],
+			]);
+			\Runtime\rtl::setAttr($payload, $path, $item);
+		}
+		else if (is_array($file["name"]))
+		{
+			foreach ($file["name"] as $index => $value)
+			{
+				$path->push($index);
+				$this->buildFiles($payload, $path, [
+					"name" => $file["name"][$index],
+					"size" => $file["size"][$index],
+					"tmp_name" => $file["tmp_name"][$index],
+					"type" => $file["type"][$index],
+				]);
+				$path->pop();
+			}
+		}
+	}
+	
+	
+	/**
+	 * Build post files
+	 */
+	function buildPostFiles($payload)
+	{
+		if (count($_FILES) == 0) return;
+		
+		foreach ($_FILES as $key => $value)
+		{
+			$this->buildFiles($payload, new \Runtime\Vector($key), $value);
+		}
+	}
+	
+	
+	/**
+	 * Build post data
+	 */
+	function buildPostData($payload, $path, $post)
+	{
+		if (gettype($post) == "array")
+		{
+			if ($path->count() > 0)
+			{
+				$key = $path->last();
+				if (!$payload->has($key))
+				{
+					$payload->set($key, new \Runtime\Map());
+				}
+				$payload = $payload->get($key);
+			}
+			foreach ($post as $key => $val)
+			{
+				$path->push($key);
+				$this->buildPostData($payload, $path, $val);
+				$path->pop();
+			}
+		}
+		else if ($path->count() > 0)
+		{
+			$key = $path->last();
+			$payload->set($key, $post);
+		}
+	}
+	
+	
+	/**
+	 * Create request
+	 */
+	function createRequest()
+	{
+		$request = new \Runtime\Web\Request();
+		$host = isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : "";
+		$uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : "";
+		$method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : "";
+		$start_time = isset($_SERVER['REQUEST_TIME_FLOAT']) ? $_SERVER['REQUEST_TIME_FLOAT'] : "";
+		$content_type = isset($_SERVER['CONTENT_TYPE']) ? $_SERVER['CONTENT_TYPE'] : "";
+		
+		$query = new \Runtime\Map();
+		$payload = new \Runtime\Map();
+		$cookies = new \Runtime\Map();
+		foreach ($_GET as $key => $val) $query->set($key, $val);
+		
+		/* Read POST */
+		$post = $this->readPost();
+		if ($post != null)
+		{
+			if ($post instanceof \Runtime\Dict)
+			{
+				$payload = $post;
+			}
+			else
+			{
+				$this->buildPostData($payload, new \Runtime\Vector(), $post);
+				$this->buildPostFiles($payload);
+			}
+		}
+		
+		/* Read Cookie */
+		foreach ($_COOKIE as $key => $value)
+		{
+			$cookies->set($key, $value);
+		}
+		
+		/* Setup uri */
+		$request->initUri($uri);
+		
+		/* Setup protocol */
+		$request->protocol = "http";
+		if (isset($_SERVER['REQUEST_SCHEME']))
+		{
+			$request->protocol = $_SERVER['REQUEST_SCHEME'];
+		}
+		if (isset($_SERVER['HTTP_X_FORWARDED_PROTO']))
+		{
+			$request->protocol = $_SERVER['HTTP_X_FORWARDED_PROTO'];
+		}
+		
+		$request->is_https = $request->protocol == "https";
+		
+		/* Setup request */
+		$request->host = $host;
+		$request->method = $method;
+		$request->query = $query;
+		$request->payload = $payload;
+		$request->cookies = $cookies;
+		$request->headers = new \Runtime\Map($_SERVER);
+		$request->start_time = $start_time;
+		return $request;
+	}
+	
+	
+	/**
+	 * Send status code
+	 */
+	function sendStatusCode($http_code)
+	{
+		http_response_code($http_code);
+	}
+	
+	
+	/**
+	 * Send header
+	 */
+	function sendHeader($key, $value)
+	{
+		header($key . ":" . $value);
+	}
+	
+	
+	/**
+	 * Send content
+	 */
+	function sendContent($content)
+	{
+		echo $content;
+	}
+	
+	
+	/**
+	 * Send response
+	 */
+	function sendResponse($container)
+	{
+		$response = $container->response;
+		
+		if ($response != null)
+		{
+			$this->sendStatusCode($response->http_code);
+			
+			/* Setup cookies */
+			if ($container->cookies != null)
+			{
+				$container->cookies->each(
+					function (Cookie $cookie)
+					{
+						if ($cookie == null) return;
+						if ($cookie->name == "") return;
+						
+						setcookie
+						(
+							$cookie->name,
+							$cookie->value,
+							$cookie->getOptions()->_map
+						);
+					}
+				);
+			}
+			
+			/* Setup headers */
+			if ($response->headers != null)
+			{
+				$response->headers->each(
+					function (string $value, string $key)
+					{
+						$this->sendHeader($key, $value);
+					}
+				);
+			}
+			
+			/* Redirect */
+			if ($response instanceof \Runtime\Web\RedirectResponse)
+			{
+				$this->sendHeader("Location", $response->redirect);
+			}
+			
+			$this->sendContent($response->getContent());
+		}
+		
+		else
+		{
+			$this->sendStatusCode(404);
+			$this->sendContent("404 Response not found");
+		}
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	function _init()
+	{
+		parent::_init();
+	}
+	static function getClassName(){ return "Runtime.Web.BasePHP"; }
+	static function getMethodsList(){ return null; }
+	static function getMethodInfoByName($field_name){ return null; }
+}

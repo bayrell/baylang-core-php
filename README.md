@@ -1,2 +1,2 @@
-# baylang-core-php
-BayLang Core
+# BayLang Core for PHP
+
