@@ -18,52 +18,50 @@
  */
 namespace Runtime\Widget\Dialog;
 
-use Runtime\Callback;
-use Runtime\Web\Messages\ClickMessage;
-use Runtime\Widget\ButtonModel;
+use Runtime\ApiResult;
+use Runtime\Widget\ResultModel;
 use Runtime\Widget\Dialog\DialogMessage;
 use Runtime\Widget\Dialog\DialogModel;
-use Runtime\Widget\Dialog\DialogModelException;
 use Runtime\Widget\Dialog\PromptDialog;
 
 
 class PromptDialogModel extends \Runtime\Widget\Dialog\DialogModel
 {
 	var $component;
+	var $action;
+	var $title;
+	var $title_button;
+	var $title_button_styles;
+	var $content;
 	var $value;
-	var $old_value;
+	var $result;
 	
 	
 	/**
-	 * Init widget settings
+	 * Init params
 	 */
-	function initWidget($params)
+	function initParams($params)
 	{
-		parent::initWidget($params);
-		/* Setup close buttons */
-		$this->buttons->addButton(new \Runtime\Map([
-			"content" => "Cancel",
-			"widget_name" => "cancel_button",
-			"styles" => new \Runtime\Vector(
-				"gray",
-			),
-			"events" => new \Runtime\Map([
-				"click" => new \Runtime\Callback($this, "onCloseButtonClick"),
-			]),
-		]));
-		/* Setup confirm button */
-		$this->buttons->addButton(new \Runtime\Map([
-			"content" => "Ok",
-			"widget_name" => "confirm_button",
-			"styles" => new \Runtime\Vector(
-				"success",
-			),
-			"events" => new \Runtime\Map([
-				"click" => new \Runtime\Callback($this, "onConfirmButtonClick"),
-			]),
-		]));
-		/* Buttons style */
-		$this->buttons->styles->add("align-end");
+		parent::initParams($params);
+		$this->result = $this->createWidget("Runtime.Widget.ResultModel");
+	}
+	
+	
+	/**
+	 * Set wait message
+	 */
+	function setWaitMessage()
+	{
+		$this->result->setWaitMessage();
+	}
+	
+	
+	/**
+	 * Set api result
+	 */
+	function setApiResult($result)
+	{
+		$this->result->setApiResult($result);
 	}
 	
 	
@@ -77,32 +75,25 @@ class PromptDialogModel extends \Runtime\Widget\Dialog\DialogModel
 	
 	
 	/**
-	 * Add close button click
+	 * Show
 	 */
-	function onCloseButtonClick($message)
+	function show()
 	{
-		$this->hide();
+		parent::show();
+		$this->result->clear();
 	}
 	
 	
 	/**
-	 * Add confirm button click
+	 * Confirm
 	 */
-	function onConfirmButtonClick($message)
+	function confirm()
 	{
-		try
-		{
-			$this->emit(new \Runtime\Widget\Dialog\DialogMessage(new \Runtime\Map([
-				"name" => "confirm",
-				"value" => $this->value,
-			])));
-		}
-		catch (\Runtime\Widget\Dialog\DialogModelException $e)
-		{
-			$this->result->setException($e);
-			return;
-		}
-		$this->hide();
+		$this->listener->emit(new \Runtime\Widget\Dialog\DialogMessage(new \Runtime\Map([
+			"name" => "confirm",
+			"action" => $this->action,
+			"value" => $this->value,
+		])));
 	}
 	
 	
@@ -111,8 +102,13 @@ class PromptDialogModel extends \Runtime\Widget\Dialog\DialogModel
 	{
 		parent::_init();
 		$this->component = "Runtime.Widget.Dialog.PromptDialog";
+		$this->action = "";
+		$this->title = "";
+		$this->title_button = "";
+		$this->title_button_styles = new \Runtime\Vector();
+		$this->content = "";
 		$this->value = "";
-		$this->old_value = "";
+		$this->result = null;
 	}
 	static function getClassName(){ return "Runtime.Widget.Dialog.PromptDialogModel"; }
 	static function getMethodsList(){ return null; }

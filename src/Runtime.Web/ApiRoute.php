@@ -18,7 +18,8 @@
  */
 namespace Runtime\Web;
 
-use Runtime\Exceptions\AbstractException;
+use Runtime\Exceptions\ApiError;
+use Runtime\Exceptions\RuntimeException;
 use Runtime\Web\ApiProvider;
 use Runtime\Web\ApiResult;
 use Runtime\Web\BaseRoute;
@@ -41,13 +42,13 @@ class ApiRoute extends \Runtime\Web\BaseRoute
 	{
 		return new \Runtime\Vector(
 			new \Runtime\Web\RouteAction(new \Runtime\Map([
-				"uri" => "/api/{service}/{api_name}/{method_name}",
+				"uri" => "/api/{api_name}/{method_name}",
 				"name" => "runtime:web:api",
 				"action" => "actionIndex",
 				"pos" => 1000,
 			])),
 			new \Runtime\Web\RouteAction(new \Runtime\Map([
-				"uri" => "/api/{service}/{api_name}/{method_name}/",
+				"uri" => "/api/{api_name}/{method_name}/",
 				"name" => "runtime:web:api:index",
 				"action" => "actionIndex",
 				"pos" => 1000,
@@ -62,32 +63,32 @@ class ApiRoute extends \Runtime\Web\BaseRoute
 	static function actionIndex($container)
 	{
 		/* Call api */
-		$api_name = $container->route->matches["api_name"];
-		$method_name = $container->route->matches["method_name"];
+		$api_name = $container->route->matches->get("api_name");
+		$method_name = $container->route->matches->get("method_name");
 		$api_result = null;
-		$bus = \Runtime\Web\Bus::getApi($api_name);
-		try
-		{
-			$api_result = $bus->send(new \Runtime\Map([
-				"api_name" => $api_name,
-				"method_name" => $method_name,
-				"layout" => $container->layout,
-				"data" => $container->request->payload->get("data"),
-				"container" => $container,
-			]));
-		}
-		catch (\Runtime\Exceptions\AbstractException $e)
-		{
-			$api_result = new \Runtime\Web\ApiResult();
-			$api_result->exception($e);
-		}
+		$bus = \Runtime\rtl::getContext()->provider("api");
+		$payload = $container->request->payload;
+		$api_result = $bus->send(new \Runtime\Map([
+			"api_name" => $api_name,
+			"method_name" => $method_name,
+			"data" => $payload,
+			"storage" => $container->layout->storage->backend,
+		]));
 		/* Create response */
 		$container->setResponse(new \Runtime\Web\JsonResponse($api_result->getContent()));
 		/* Set cookie */
-		$api_result->cookies->each(function ($cookie) use (&$container)
+		if ($api_result instanceof \Runtime\Web\ApiResult)
 		{
-			$container->addCookie($cookie);
-		});
+			$api_result->cookies->each(function ($cookie) use (&$container)
+			{
+				$container->addCookie($cookie);
+			});
+		}
+		/* HTTP error if exception */
+		if ($api_result->isException())
+		{
+			$container->response->http_code = 500;
+		}
 	}
 	
 	

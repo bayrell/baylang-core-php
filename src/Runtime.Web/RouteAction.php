@@ -19,8 +19,7 @@
 namespace Runtime\Web;
 
 use Runtime\Method;
-use Runtime\SerializeInterface;
-use Runtime\Serializer;
+use Runtime\Serializer\ObjectType;
 use Runtime\Entity\Factory;
 use Runtime\Web\BaseRoute;
 use Runtime\Web\RouteInfo;
@@ -35,10 +34,9 @@ class RouteAction extends \Runtime\Web\RouteInfo
 	/**
 	 * Process frontend data
 	 */
-	function serialize($serializer, $data)
+	static function serialize($rules)
 	{
-		$serializer->process($this, "action", $data);
-		parent::serialize($serializer, $data);
+		parent::serialize($rules);
 	}
 	
 	
@@ -84,7 +82,7 @@ class RouteAction extends \Runtime\Web\RouteInfo
 			$action = new \Runtime\Method($base_route, $base_route->action);
 		}
 		/* Apply action */
-		if ($action->exists())
+		if ($action && $action->exists())
 		{
 			$action->apply(new \Runtime\Vector($container));
 		}

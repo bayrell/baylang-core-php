@@ -63,6 +63,8 @@ class ModuleDescription
 		return new \Runtime\Vector(
 			new \Runtime\Entity\Provider("Runtime.Web.RouteProvider"),
 			new \Runtime\Entity\Hook("Runtime.Web.Hooks.AppHook"),
+			new \Runtime\Entity\Provider("api", "Runtime.Web.BusLocal"),
+			new \Runtime\Web\Annotations\Route("Runtime.Web.ApiRoute"),
 		);
 	}
 	

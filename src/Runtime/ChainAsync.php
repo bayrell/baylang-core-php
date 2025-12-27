@@ -35,7 +35,9 @@ class ChainAsync extends \Runtime\Chain
 			{
 				$item = $this->chain->get($i);
 				$f = $item->get("method");
-				$res = $f->apply($args);
+				$res = null;
+				if ($f instanceof \Runtime\Method) $res = $f->apply($args);
+				else $res = \Runtime\rtl::apply($f, $args);
 			}
 		};
 		return $f();

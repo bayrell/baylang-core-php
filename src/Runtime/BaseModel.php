@@ -22,7 +22,8 @@ use Runtime\BaseObject;
 use Runtime\RenderContainer;
 use Runtime\Listener;
 use Runtime\Method;
-use Runtime\Serializer;
+use Runtime\Serializer\ObjectType;
+use Runtime\Serializer\StringType;
 use Runtime\SerializeInterface;
 
 
@@ -59,7 +60,8 @@ class BaseModel extends \Runtime\BaseObject implements \Runtime\SerializeInterfa
 	{
 		if (!$params) return;
 		$this->parent_widget = $params->get("parent_widget");
-		$this->layout = $this->parent_widget ? $this->parent_widget->layout : null;
+		if ($params->has("layout")) $this->layout = $params->get("layout");
+		else $this->layout = $this->parent_widget ? $this->parent_widget->layout : null;
 		/* Setup params */
 		$this->component = $params->has("component") ? $params->get("component") : $this->component;
 	}
@@ -74,9 +76,9 @@ class BaseModel extends \Runtime\BaseObject implements \Runtime\SerializeInterfa
 	/**
 	 * Serialize object
 	 */
-	function serialize($serializer, $data)
+	static function serialize($rules)
 	{
-		$serializer->process($this, "component", $data);
+		$rules->addType("component", new \Runtime\Serializer\StringType());
 	}
 	
 	
@@ -101,6 +103,15 @@ class BaseModel extends \Runtime\BaseObject implements \Runtime\SerializeInterfa
 		if (!$params->has("parent_widget")) $params->set("parent_widget", $this);
 		$widget = \Runtime\rtl::newInstance($class_name, new \Runtime\Vector($params));
 		return $widget;
+	}
+	
+	
+	/**
+	 * Add event listener
+	 */
+	function addEventListener($event_name, $f, $priority = 100)
+	{
+		$this->listener->add($event_name, $f, $priority);
 	}
 	
 	

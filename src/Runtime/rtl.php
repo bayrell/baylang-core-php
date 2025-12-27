@@ -19,12 +19,15 @@
 namespace Runtime;
 
 use Runtime\BaseObject;
-use Runtime\Callback;
 use Runtime\Context;
 use Runtime\Date;
 use Runtime\DateTime;
+use Runtime\Method;
 use Runtime\Entity\Provider;
 use Runtime\Exceptions\AssertException;
+use Runtime\SerializeInterface;
+use Runtime\Serializer\ObjectType;
+use Runtime\VirtualDom;
 
 
 class rtl
@@ -150,6 +153,22 @@ class rtl
 	
 	
 	/**
+	 * Returns parents
+	 */
+	static function getParents($class_name, $last_name = "")
+	{
+		$result = new \Runtime\Vector();
+		$parent_class_name = $class_name;
+		while ($parent_class_name != "" && $parent_class_name != $last_name)
+		{
+			$result->push($parent_class_name);
+			$parent_class_name = static::parentClassName($parent_class_name);
+		}
+		return $result;
+	}
+	
+	
+	/**
 	 * Returns true if class instanceof class_name
 	 * @return bool
 	 */
@@ -245,6 +264,28 @@ class rtl
 	
 	
 	/**
+	 * Apply method
+	 */
+	static function apply($f, $args)
+	{
+		if ($f instanceof \Runtime\Method) return $f->apply($args);
+		if ($args) $args = $args->toArray();
+		else $args = [];
+		
+		return call_user_func_array($f, $args);
+	}
+	
+	
+	/**
+	 * Assert
+	 */
+	static function assert($value, $message)
+	{
+		if (!$value) throw new \Runtime\Exceptions\AssertException($message);
+	}
+	
+	
+	/**
 	 * Return attr value by name
 	 */
 	static function attr($item, $name, $def_val = null)
@@ -273,6 +314,53 @@ class rtl
 	static function exists($value)
 	{
 		return isset($value);
+	}
+	
+	
+	/**
+	 * Returns value type
+	 */
+	static function getType($value)
+	{
+		if ($value === null) return "null";
+		if (static::isString($value)) return "string";
+		if (static::isInteger($value)) return "integer";
+		if (static::isFloat($value)) return "float";
+		if (static::isBoolean($value)) return "boolean";
+		if ($value instanceof \Runtime\Vector) return "vector";
+		if ($value instanceof \Runtime\Map) return "map";
+		return "object";
+	}
+	
+	
+	/**
+	 * Returns true if value is boolean
+	 * @param var value
+	 * @return bool
+	 */
+	static function isBoolean($value)
+	{
+		return $value === true || $value === false;
+	}
+	
+	
+	/**
+	 * Returns true if value is integer
+	 * @param var value
+	 * @return bool
+	 */
+	static function isInteger($value)
+	{
+		return is_int($value);
+	}
+	
+	
+	/**
+	 * Returns true if float
+	 */
+	static function isFloat($value)
+	{
+		return is_float($value);
 	}
 	
 	
@@ -312,6 +400,15 @@ class rtl
 	static function isMap($value)
 	{
 		return $value instanceof \Runtime\Map;
+	}
+	
+	
+	/**
+	 * Returns true if function
+	 */
+	static function isFunction($value)
+	{
+		return is_callable($value);
 	}
 	
 	
@@ -384,7 +481,15 @@ class rtl
 	 */
 	static function toNative($obj)
 	{
-		
+		if ($obj instanceof \Runtime\Vector)
+		{
+			return $obj->map(function ($value) { return static::toNative($value); });
+		}
+		else if ($obj instanceof \Runtime\Map)
+		{
+			return $obj->map(function ($value) { return static::toNative($value); })->toObject();
+		}
+		return $obj;
 	}
 	
 	
@@ -405,6 +510,26 @@ class rtl
 	
 	
 	/**
+	 * Assign object
+	 */
+	static function assign($obj, $data, $errors = new \Runtime\Vector())
+	{
+		$rules = new \Runtime\Serializer\ObjectType();
+		return $rules->filter($data, $errors, $obj);
+	}
+	
+	
+	/**
+	 * Serialize object
+	 */
+	static function serialize($obj)
+	{
+		$rules = new \Runtime\Serializer\ObjectType();
+		return $rules->encode($obj);
+	}
+	
+	
+	/**
 	 * Json Decode
 	 */
 	static function jsonDecode($obj)
@@ -416,9 +541,23 @@ class rtl
 	/**
 	 * Json encode
 	 */
-	static function jsonEncode($obj)
+	static function jsonEncode($obj, $flags = 0)
 	{
-		return json_encode($obj);
+		$f = 0;
+		if (($flags & static::JSON_PRETTY) == static::JSON_PRETTY) $f = $f | JSON_PRETTY_PRINT;
+		return json_encode($obj, $f | JSON_UNESCAPED_SLASHES);
+	}
+	
+	
+	/**
+	 * Copy object
+	 */
+	static function copy($obj)
+	{
+		$data = static::serialize($obj);
+		$item = static::newInstance($obj::getClassName());
+		static::assign($item, $data);
+		return $item;
 	}
 	
 	
@@ -474,6 +613,54 @@ class rtl
 	
 	
 	/* ================================= Math Functions ================================== */
+	/**
+	 * Abs
+	 */
+	static function abs($value)
+	{
+		return abs($value);
+	}
+	
+	
+	/**
+	 * Returns max a and b
+	 */
+	static function max($a, $b){ return $a > $b ? $a : $b; }
+	
+	
+	/**
+	 * Returns min a and b
+	 */
+	static function min($a, $b){ return $a < $b ? $a : $b; }
+	
+	
+	/**
+	 * Ceil
+	 */
+	static function ceil($value)
+	{
+		return (int)ceil($value);
+	}
+	
+	
+	/**
+	 * Floor
+	 */
+	static function floor($value)
+	{
+		return (int)floor($value);
+	}
+	
+	
+	/**
+	 * Round
+	 */
+	static function round($value)
+	{
+		return round($value);
+	}
+	
+	
 	/**
 	 * Returns random value x, where 0 <= x < 1
 	 * @return double
@@ -579,8 +766,10 @@ class rtl
 	{
 		$app_data = static::fromNative($app_data);
 		/* Create context */
+		$environments = $app_data->get("environments");
 		$modules = $app_data->get("modules");
 		$context = static::createContext(new \Runtime\Map([
+			"environments" => $environments,
 			"modules" => $modules,
 		]));
 		/* Start context */
@@ -593,6 +782,12 @@ class rtl
 			$callback($result);
 		}
 	}
+	
+	
+	/**
+	 * Render Virtual Dom
+	 */
+	static function render($vdom){ return \Runtime\rtl::getContext()->provider("render")->render($vdom); }
 	
 	
 	/* ================================= Other Functions ================================= */

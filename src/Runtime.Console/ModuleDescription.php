@@ -58,7 +58,7 @@ class ModuleDescription
 	{
 		return new \Runtime\Vector(
 			new \Runtime\Console\Annotations\ConsoleCommand("Runtime.Console.Commands.Help"),
-			new \Runtime\Entity\Provider("Runtime.Console.CommandsList", new \Runtime\Console\CommandsList()),
+			new \Runtime\Entity\Provider("Runtime.Console.CommandsList"),
 		);
 	}
 	

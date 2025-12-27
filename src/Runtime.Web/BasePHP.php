@@ -35,6 +35,18 @@ use Runtime\Web\Hooks\AppHook;
 class BasePHP extends \Runtime\BaseProvider
 {
 	/**
+	 * Start app
+	 */
+	function main()
+	{
+		$container = $this->createRenderContainer();
+		$container->request = $this->createRequest();
+		$container->resolve();
+		$this->sendResponse($container);
+	}
+	
+	
+	/**
 	 * Create render container
 	 */
 	function createRenderContainer()
@@ -127,12 +139,25 @@ class BasePHP extends \Runtime\BaseProvider
 		{
 			if ($path->count() > 0)
 			{
-				$key = $path->last();
-				if (!$payload->has($key))
+				$keys = array_keys($post);
+				$first = array_first($keys);
+				
+				$new_item = null;
+				if (is_int($first)) $new_item = new \Runtime\Vector();
+				else $new_item = new \Runtime\Map();
+				
+				if ($payload instanceof \Runtime\Map)
 				{
-					$payload->set($key, new \Runtime\Map());
+					$key = $path->last();
+					if (is_int($key)) $payload->set($key, $new_item);
+					else $payload->set($key, $new_item);
+					$payload = $payload->get($key);
 				}
-				$payload = $payload->get($key);
+				else if ($payload instanceof \Runtime\Vector)
+				{
+					$payload->push($new_item);
+					$payload = $payload->last();
+				}
 			}
 			foreach ($post as $key => $val)
 			{
@@ -170,7 +195,7 @@ class BasePHP extends \Runtime\BaseProvider
 		$post = $this->readPost();
 		if ($post != null)
 		{
-			if ($post instanceof \Runtime\Dict)
+			if ($post instanceof \Runtime\Map)
 			{
 				$payload = $post;
 			}

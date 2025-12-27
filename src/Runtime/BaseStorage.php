@@ -20,22 +20,27 @@ namespace Runtime;
 
 use Runtime\BaseModel;
 use Runtime\Serializer;
+use Runtime\Serializer\MapType;
+use Runtime\Serializer\ObjectType;
+use Runtime\Serializer\Schema;
 
 
 class BaseStorage extends \Runtime\BaseModel
 {
 	var $widget_name;
-	var $frontend_params;
-	var $backend_params;
+	var $frontend;
+	var $backend;
 	
 	
 	/**
-	 * Serializer model
+	 * Returns object schema
 	 */
-	function serialize($serializer, $data)
+	static function serialize($serializer)
 	{
-		parent::serialize($serializer, $data);
-		$serializer->process($this, "frontend_params", $data);
+		parent::serialize($serializer);
+		$serializer->addType("frontend", new \Runtime\Serializer\MapType(new \Runtime\Serializer\ObjectType(new \Runtime\Map([
+			"autocreate" => true,
+		]))));
 	}
 	
 	
@@ -44,7 +49,7 @@ class BaseStorage extends \Runtime\BaseModel
 	 */
 	function set($key, $value)
 	{
-		$this->frontend_params->set($key, $value);
+		$this->frontend->set($key, $value);
 	}
 	
 	
@@ -53,8 +58,8 @@ class BaseStorage extends \Runtime\BaseModel
 	{
 		parent::_init();
 		$this->widget_name = "storage";
-		$this->frontend_params = new \Runtime\Map();
-		$this->backend_params = new \Runtime\Map();
+		$this->frontend = new \Runtime\Map();
+		$this->backend = new \Runtime\Map();
 	}
 	static function getClassName(){ return "Runtime.BaseStorage"; }
 	static function getMethodsList(){ return null; }

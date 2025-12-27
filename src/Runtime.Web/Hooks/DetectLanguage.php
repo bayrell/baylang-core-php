@@ -48,9 +48,10 @@ class DetectLanguage extends \Runtime\Hooks\RuntimeHook
 	/**
 	 * Init params
 	 */
-	function initParam($params)
+	function initParams($params)
 	{
-		parent::initParam($params);
+		parent::initParams($params);
+		if (!$params) return;
 		if ($params->has("allowed_languages"))
 		{
 			$this->allowed_languages = $params->get("allowed_languages");
@@ -86,6 +87,13 @@ class DetectLanguage extends \Runtime\Hooks\RuntimeHook
 		if (!$container->route->matches->has($this->route_match_name)) return;
 		/* Detect lang */
 		$container->layout->lang = $container->route->matches->get($this->route_match_name);
+		/* Redirect */
+		if ($this->allowed_languages->indexOf($container->layout->lang) == -1)
+		{
+			$full_uri = $container->request->full_uri;
+			$redirect_uri = "/" . $this->default_language . $full_uri;
+			$container->setResponse(new \Runtime\Web\RedirectResponse($redirect_uri));
+		}
 	}
 	
 	
@@ -106,7 +114,7 @@ class DetectLanguage extends \Runtime\Hooks\RuntimeHook
 	function _init()
 	{
 		parent::_init();
-		$this->default_language = "";
+		$this->default_language = "en";
 		$this->route_match_name = "lang";
 		$this->allowed_languages = new \Runtime\Vector();
 	}

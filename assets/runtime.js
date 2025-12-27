@@ -112,8 +112,26 @@ Runtime.rtl = class
 	static parentClassName(class_name)
 	{
 		var obj = this.findClass(class_name);
+		if (obj && obj.extends && obj.extends.name) return obj.extends.name;
 		var parentObj = obj ? Object.getPrototypeOf(obj) : null;
 		return parentObj && parentObj.getClassName ? parentObj.getClassName() : "";
+	}
+	
+	
+	/**
+	 * Returns parents
+	 */
+	static getParents(class_name, last_name)
+	{
+		if (last_name == undefined) last_name = "";
+		let result = Runtime.Vector.create([]);
+		let parent_class_name = class_name;
+		while (parent_class_name != "" && parent_class_name != last_name)
+		{
+			result.push(parent_class_name);
+			parent_class_name = this.parentClassName(parent_class_name);
+		}
+		return result;
 	}
 	
 	
@@ -201,6 +219,26 @@ Runtime.rtl = class
 	
 	
 	/**
+	 * Apply method
+	 */
+	static apply(f, args)
+	{
+		if (f instanceof Runtime.Method) return f.apply(args);
+		if (!args) args = [];
+		return f.apply(null, args);
+	}
+	
+	
+	/**
+	 * Assert
+	 */
+	static assert(value, message)
+	{
+		if (!value) throw new Runtime.Exceptions.AssertException(message);
+	}
+	
+	
+	/**
 	 * Return attr value by name
 	 */
 	static attr(item, name, def_val)
@@ -227,6 +265,55 @@ Runtime.rtl = class
 	static exists(value)
 	{
 		return (value != null) && (value != undefined);
+	}
+	
+	
+	/**
+	 * Returns value type
+	 */
+	static getType(value)
+	{
+		if (value === null) return "null";
+		if (this.isString(value)) return "string";
+		if (this.isInteger(value)) return "integer";
+		if (this.isFloat(value)) return "float";
+		if (this.isBoolean(value)) return "boolean";
+		if (value instanceof Runtime.Vector) return "vector";
+		if (value instanceof Runtime.Map) return "map";
+		return "object";
+	}
+	
+	
+	/**
+	 * Returns true if value is boolean
+	 * @param var value
+	 * @return bool
+	 */
+	static isBoolean(value)
+	{
+		return value === true || value === false;
+	}
+	
+	
+	/**
+	 * Returns true if value is integer
+	 * @param var value
+	 * @return bool
+	 */
+	static isInteger(value)
+	{
+		if (typeof value == 'number') return true;
+		return false;
+	}
+	
+	
+	/**
+	 * Returns true if float
+	 */
+	static isFloat(value)
+	{
+		if (typeof value == 'number') return true;
+		return false;
 	}
 	
 	
@@ -267,6 +354,15 @@ Runtime.rtl = class
 	static isMap(value)
 	{
 		return value instanceof Map;
+	}
+	
+	
+	/**
+	 * Returns true if function
+	 */
+	static isFunction(value)
+	{
+		return value instanceof Function;
 	}
 	
 	
@@ -381,6 +477,27 @@ Runtime.rtl = class
 	
 	
 	/**
+	 * Assign object
+	 */
+	static assign(obj, data, errors)
+	{
+		if (errors == undefined) errors = Runtime.Vector.create([]);
+		let rules = new Runtime.Serializer.ObjectType();
+		return rules.filter(data, errors, obj);
+	}
+	
+	
+	/**
+	 * Serialize object
+	 */
+	static serialize(obj)
+	{
+		let rules = new Runtime.Serializer.ObjectType();
+		return rules.encode(obj);
+	}
+	
+	
+	/**
 	 * Json Decode
 	 */
 	static jsonDecode(obj)
@@ -404,9 +521,22 @@ Runtime.rtl = class
 	/**
 	 * Json encode
 	 */
-	static jsonEncode(obj)
+	static jsonEncode(obj, flags)
 	{
+		if (flags == undefined) flags = 0;
 		return JSON.stringify(obj);
+	}
+	
+	
+	/**
+	 * Copy object
+	 */
+	static copy(obj)
+	{
+		let data = this.serialize(obj);
+		let item = this.newInstance(obj.constructor.getClassName());
+		this.assign(item, data);
+		return item;
 	}
 	
 	
@@ -464,6 +594,54 @@ Runtime.rtl = class
 	
 	
 	/* ================================= Math Functions ================================== */
+	/**
+	 * Abs
+	 */
+	static abs(value)
+	{
+		return Math.abs(value);
+	}
+	
+	
+	/**
+	 * Returns max a and b
+	 */
+	static max(a, b){ return a > b ? a : b; }
+	
+	
+	/**
+	 * Returns min a and b
+	 */
+	static min(a, b){ return a < b ? a : b; }
+	
+	
+	/**
+	 * Ceil
+	 */
+	static ceil(value)
+	{
+		return Math.ceil(value);
+	}
+	
+	
+	/**
+	 * Floor
+	 */
+	static floor(value)
+	{
+		return Math.floor(value);
+	}
+	
+	
+	/**
+	 * Round
+	 */
+	static round(value)
+	{
+		return Math.round(value);
+	}
+	
+	
 	/**
 	 * Returns random value x, where 0 <= x < 1
 	 * @return double
@@ -541,9 +719,9 @@ Runtime.rtl = class
 	static async createApp(app, modules)
 	{
 		let params = Runtime.Map.create({
-			"providers": new Runtime.Vector(
+			"providers": Runtime.Vector.create([
 				new Runtime.Entity.Provider("app", app),
-			),
+			]),
 			"modules": modules,
 		});
 		let context = await this.createContext(params);
@@ -578,8 +756,10 @@ Runtime.rtl = class
 		if (callback == undefined) callback = null;
 		app_data = this.fromNative(app_data);
 		/* Create context */
+		let environments = app_data.get("environments");
 		let modules = app_data.get("modules");
 		let context = await this.createContext(Runtime.Map.create({
+			"environments": environments,
 			"modules": modules,
 		}));
 		/* Start context */
@@ -592,6 +772,12 @@ Runtime.rtl = class
 			callback(result);
 		}
 	}
+	
+	
+	/**
+	 * Render Virtual Dom
+	 */
+	static render(vdom){ return Runtime.rtl.getContext().provider("render").render(vdom); }
 	
 	
 	/* ================================= Other Functions ================================= */
@@ -1268,7 +1454,7 @@ Runtime.rs = class
 		let arr2 = arr.filter((s) => { return s != ""; }).transition((item) =>
 		{
 			let arr = this.split("=", item);
-			return new Runtime.Vector(arr[1], arr[0]);
+			return Runtime.Vector.create([arr[1], arr[0]]);
 		});
 		return Runtime.Map.create({
 			"uri": uri,
@@ -1312,6 +1498,23 @@ Runtime.rs = class
 		s = s1;
 		s2 = this.join("&", arr);
 		if (s2 != "") s = s + String("?") + String(s2);
+		return s;
+	}
+	
+	
+	/**
+	 * Url get add
+	 */
+	static urlGetAdd(s, params)
+	{
+		let keys = Runtime.rtl.list(params.keys());
+		for (let i = 0; i < keys.count(); i++)
+		{
+			let key = keys.get(i);
+			let value = params.get(key);
+			if (!value) continue;
+			s = this.url_get_add(s, key, value);
+		}
 		return s;
 	}
 	
@@ -1432,7 +1635,7 @@ Runtime.rs = class
 			global_hash.set("component_hash", component_hash);
 		}
 		if (component_hash.has(class_name)) return component_hash.get(class_name);
-		let result = new Runtime.Vector();
+		let result = Runtime.Vector.create([]);
 		let item_name = class_name;
 		while (item_name != "" && item_name != "Runtime.Component")
 		{
@@ -1544,6 +1747,87 @@ Runtime.rs = class
 	static getInterfaces(){ return []; }
 };
 window["Runtime.rs"] = Runtime.rs;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+Runtime.BaseObject = class
+{
+	/**
+	 * Constructor
+	 */
+	constructor()
+	{
+		/* Init object */
+		this._init();
+	}
+	
+	
+	/**
+	 * Returns new isntance
+	 */
+	static newInstance(args){ return Runtime.rtl.newInstance(this.getClassName(), args); }
+	
+	
+	/**
+	 * Init function
+	 */
+	_init()
+	{
+	}
+	
+	
+	/**
+	 * Serialize object
+	 */
+	static serialize(rules)
+	{
+		rules.setClassName(this.getClassName());
+	}
+	
+	
+	/**
+	 * Assign new values
+	 */
+	_assign_values(changes)
+	{
+		if (changes == undefined) changes = null;
+		if (changes instanceof Map)
+		{
+			for (var key of changes.keys())
+			{
+				var value = changes.get(key);
+				this[key] = value;
+			}
+		}
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+	}
+	static getClassName(){ return "Runtime.BaseObject"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.BaseObject"] = Runtime.BaseObject;
 "use strict;"
 /*!
  *  BayLang Technology
@@ -1831,6 +2115,16 @@ Runtime.Map = class extends Map
 	
 	
 	/**
+	 * Intersect
+	 */
+	intersect(fields)
+	{
+		const h = fields.transition((value, key) => [key, value]);
+		return this.filter((value, key) => h.has(key));
+	}
+	
+	
+	/**
 	 * Create map from Object
 	 */
 	static create(obj)
@@ -1942,6 +2236,16 @@ Runtime.Vector = class extends Array
 	
 	
 	/**
+	 * Remove item
+	 */
+	removeItem(item)
+	{
+		let pos = this.findIndex((elem) => { return elem == item; });
+		if (pos >=0) this.remove(pos);
+	}
+	
+	
+	/**
 	 * Flatten Array
 	 */
 	flatten()
@@ -2001,6 +2305,7 @@ Runtime.Vector = class extends Array
 		const map = new RuntimeMap();
 		for (let i=0; i<this.length; i++)
 		{
+			let res = null;
 			if (f) res = f(this[i], i, this);
 			else res = [this[i], i];
 			map.set(res[1], res[0]);
@@ -2041,8 +2346,17 @@ Runtime.Vector = class extends Array
 		return res;
 	}
 	
-	static create(arr){ return new Runtime.Vector(...arr); }
-	static from(arr){ return new Runtime.Vector(...arr); }
+	static create(arr)
+	{
+		if (arr.length == 1)
+		{
+			let value = new Runtime.Vector();
+			value.push(arr[0]);
+			return value;
+		}
+		return new Runtime.Vector(...arr);
+	}
+	static from(arr){ return this.create(arr); }
 	static getNamespace(){ return "Runtime"; }
 	static getClassName(){ return "Runtime.Vector"; }
 }
@@ -2238,7 +2552,8 @@ Runtime.Exceptions.ApiError = class extends Runtime.Exceptions.RuntimeException
 	constructor(prev)
 	{
 		if (prev == undefined) prev = null;
-		super(prev.getErrorMessage(), Runtime.rtl.ERROR_API_ERROR, prev);
+		super(prev.getErrorMessage(), Runtime.rtl.ERROR_API, prev instanceof Runtime.Exceptions.RuntimeException ? prev : null);
+		if (prev instanceof Runtime.ApiResult) this.result = prev;
 	}
 	
 	
@@ -2291,6 +2606,7 @@ Runtime.Exceptions.ApiError = class extends Runtime.Exceptions.RuntimeException
 	_init()
 	{
 		super._init();
+		this.result = null;
 	}
 	static getClassName(){ return "Runtime.Exceptions.ApiError"; }
 	static getMethodsList(){ return null; }
@@ -2382,6 +2698,78 @@ Runtime.Exceptions.CurlException = class extends Runtime.Exceptions.RuntimeExcep
 	static getInterfaces(){ return []; }
 };
 window["Runtime.Exceptions.CurlException"] = Runtime.Exceptions.CurlException;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Exceptions == 'undefined') Runtime.Exceptions = {};
+
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Exceptions == 'undefined') Runtime.Exceptions = {};
+Runtime.Exceptions.FieldException = class extends Runtime.Exceptions.RuntimeException
+{
+	/**
+	 * Create object
+	 */
+	constructor(data, prev)
+	{
+		if (prev == undefined) prev = null;
+		super("Field error", Runtime.rtl.ERROR_UNKNOWN, prev);
+		this.data = data;
+	}
+	
+	
+	/**
+	 * Returns data
+	 */
+	getData(){ return this.data; }
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.data = null;
+	}
+	static getClassName(){ return "Runtime.Exceptions.FieldException"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return ["Runtime.Exceptions.DataError"]; }
+};
+window["Runtime.Exceptions.FieldException"] = Runtime.Exceptions.FieldException;
 "use strict;"
 /*!
  *  BayLang Technology
@@ -2552,59 +2940,203 @@ if (typeof Runtime == 'undefined') Runtime = {};
  *  limitations under the License.
  */
 if (typeof Runtime == 'undefined') Runtime = {};
-Runtime.BaseObject = class
+Runtime.ApiResult = class extends Runtime.BaseObject
 {
 	/**
-	 * Constructor
+	 * Returns true if error
 	 */
-	constructor()
+	isError(){ return this.code < 0; }
+	
+	
+	/**
+	 * Returns true if is exception
+	 */
+	isException(){ return this.is_exception; }
+	
+	
+	/**
+	 * Returns true if success
+	 */
+	isSuccess(){ return this.code > 0; }
+	
+	
+	/**
+	 * Get error message
+	 */
+	getErrorMessage(){ return this.message; }
+	
+	
+	/**
+	 * Get error code
+	 */
+	getErrorCode(){ return this.code; }
+	
+	
+	/**
+	 * Returns content
+	 */
+	getContent()
 	{
-		/* Init object */
-		this._init();
+		let res = Runtime.Map.create({
+			"api_name": this.api_name,
+			"method_name": this.method_name,
+			"code": this.code,
+			"message": this.message,
+			"data": this.data,
+		});
+		if (this.error_name != "") res.set("error_name", this.error_name);
+		if (this.error_file != "") res.set("error_file", this.error_file);
+		if (this.error_line != "") res.set("error_line", this.error_line);
+		if (this.error_pos != "") res.set("error_pos", this.error_pos);
+		if (this.error_trace != "") res.set("error_trace", this.error_trace);
+		return res;
 	}
 	
 	
 	/**
-	 * Returns new isntance
+	 * Import content
 	 */
-	static newInstance(args){ return Runtime.rtl.newInstance(this.getClassName(), args); }
-	
-	
-	/**
-	 * Init function
-	 */
-	_init()
+	importContent(content)
 	{
+		this.api_name = content.get("api_name", "");
+		this.method_name = content.get("method_name", "");
+		this.data = content.get("data", null);
+		this.code = content.get("code", -1);
+		this.message = content.get("message", "Unknown error");
+		this.ob_content = content.get("ob_content", "");
+		this.error_name = content.get("error_name", "");
+		this.error_file = content.get("error_file", "");
+		this.error_line = content.get("error_line", "");
+		this.error_trace = content.get("error_trace", Runtime.Vector.create([]));
+		this.error_pos = content.get("error_pos", "");
+		this.is_exception = this.error_file != "";
+		return this;
 	}
 	
 	
 	/**
-	 * Assign new values
+	 * Set data
 	 */
-	_assign_values(changes)
+	setData(data)
 	{
-		if (changes == undefined) changes = null;
-		if (changes instanceof Map)
+		if (data == null) return;
+		if (data instanceof Runtime.Dict)
 		{
-			for (var key of changes.keys())
+			let keys = data.keys();
+			for (let i = 0; i < keys.count(); i++)
 			{
-				var value = changes.get(key);
-				this[key] = value;
+				let key = keys.get(i);
+				this.data.set(key, data.get(key));
 			}
 		}
+		else
+		{
+			this.data = data;
+		}
+		return this;
+	}
+	
+	
+	/**
+	 * Setup success
+	 */
+	success(data)
+	{
+		if (data == undefined) data = null;
+		this.code = Runtime.rtl.ERROR_OK;
+		this.message = "Ok";
+		if (!data) return this;
+		/* Set code */
+		if (data.has("code")) this.code = data.get("code");
+		else this.code = Runtime.rtl.ERROR_OK;
+		/* Set message */
+		if (data.has("message")) this.message = data.get("message");
+		else this.message = "Ok";
+		/* Set data */
+		if (data.has("data")) this.setData(data.get("data"));
+		return this;
+	}
+	
+	
+	/**
+	 * Setup exception
+	 */
+	exception(e)
+	{
+		this.code = e.getErrorCode();
+		this.message = e.getErrorMessage();
+		this.error_name = e.constructor.getClassName();
+		this.error_file = e.getFileName();
+		this.error_line = e.getErrorLine();
+		this.error_pos = e.getErrorPos();
+		if (Runtime.rtl.getContext().env("DEBUG"))
+		{
+			this.error_trace = e.getTraceCollection();
+		}
+		if (Runtime.rtl.isImplements(e, "Runtime.Exceptions.DataError")) this.data = e.getData();
+		this.is_exception = true;
+		return this;
+	}
+	
+	
+	/**
+	 * Setup fail
+	 */
+	fail(data)
+	{
+		if (data == undefined) data = null;
+		this.code = Runtime.rtl.ERROR_UNKNOWN;
+		this.message = "Unknown error";
+		if (data instanceof Runtime.Exceptions.RuntimeException)
+		{
+			this.code = data.getErrorCode();
+			this.message = data.getErrorMessage();
+			this.error_name = data.constructor.getClassName();
+			if (Runtime.rtl.isImplements(data, "Runtime.Exceptions.DataError")) this.data = data.getData();
+		}
+		else if (data instanceof Runtime.Map)
+		{
+			/* Set code */
+			if (data.has("code")) this.code = data.get("code");
+			else this.code = Runtime.rtl.ERROR_UNKNOWN;
+			/* Set message */
+			if (data.has("message")) this.message = data.get("message");
+			else this.message = "Error";
+			/* Set data */
+			if (data.has("data")) this.setData(data.get("data"));
+		}
+		else
+		{
+			this.code = Runtime.rtl.ERROR_UNKNOWN;
+			this.message = "Error";
+		}
+		return this;
 	}
 	
 	
 	/* ========= Class init functions ========= */
 	_init()
 	{
+		super._init();
+		this.code = 0;
+		this.message = "";
+		this.data = new Runtime.Map();
+		this.api_name = "";
+		this.method_name = "";
+		this.ob_content = "";
+		this.error_name = null;
+		this.error_file = "";
+		this.error_line = "";
+		this.error_pos = 0;
+		this.error_trace = null;
+		this.is_exception = false;
 	}
-	static getClassName(){ return "Runtime.BaseObject"; }
+	static getClassName(){ return "Runtime.ApiResult"; }
 	static getMethodsList(){ return null; }
 	static getMethodInfoByName(field_name){ return null; }
 	static getInterfaces(){ return []; }
 };
-window["Runtime.BaseObject"] = Runtime.BaseObject;
+window["Runtime.ApiResult"] = Runtime.ApiResult;
 "use strict;"
 /*!
  *  BayLang Technology
@@ -2652,7 +3184,8 @@ Runtime.BaseModel = class extends Runtime.BaseObject
 	{
 		if (!params) return;
 		this.parent_widget = params.get("parent_widget");
-		this.layout = this.parent_widget ? this.parent_widget.layout : null;
+		if (params.has("layout")) this.layout = params.get("layout");
+		else this.layout = this.parent_widget ? this.parent_widget.layout : null;
 		/* Setup params */
 		this.component = params.has("component") ? params.get("component") : this.component;
 	}
@@ -2669,9 +3202,9 @@ Runtime.BaseModel = class extends Runtime.BaseObject
 	/**
 	 * Serialize object
 	 */
-	serialize(serializer, data)
+	static serialize(rules)
 	{
-		serializer.process(this, "component", data);
+		rules.addType("component", new Runtime.Serializer.StringType());
 	}
 	
 	
@@ -2699,8 +3232,18 @@ Runtime.BaseModel = class extends Runtime.BaseObject
 		if (params == undefined) params = null;
 		if (params == null) params = new Runtime.Map();
 		if (!params.has("parent_widget")) params.set("parent_widget", this);
-		let widget = Runtime.rtl.newInstance(class_name, new Runtime.Vector(params));
+		let widget = Runtime.rtl.newInstance(class_name, Runtime.Vector.create([params]));
 		return widget;
+	}
+	
+	
+	/**
+	 * Add event listener
+	 */
+	addEventListener(event_name, f, priority)
+	{
+		if (priority == undefined) priority = 100;
+		this.listener.add(event_name, f, priority);
 	}
 	
 	
@@ -2773,26 +3316,23 @@ Runtime.BaseLayout = class extends Runtime.BaseModel
 	/**
 	 * Serialize object
 	 */
-	serialize(serializer, data)
+	static serialize(rules)
 	{
-		super.serialize(serializer, data);
-		serializer.process(this, "components", data);
-		serializer.process(this, "current_page_model", data);
-		serializer.process(this, "lang", data);
-		serializer.process(this, "theme", data);
-		serializer.process(this, "title", data);
-		serializer.process(this, "pages", data, new Runtime.Method(this, "serializePage"));
-		serializer.process(this, "storage", data);
-	}
-	
-	
-	/**
-	 * Serialize page
-	 */
-	serializePage(serializer, data)
-	{
-		let class_name = data.get("__class_name__");
-		return this.createWidget(class_name, data);
+		super.serialize(rules);
+		rules.addType("components", new Runtime.Serializer.VectorType(new Runtime.Serializer.StringType()));
+		rules.addType("current_page_model", new Runtime.Serializer.StringType());
+		rules.addType("lang", new Runtime.Serializer.StringType());
+		rules.addType("theme", new Runtime.Serializer.StringType());
+		rules.addType("title", new Runtime.Serializer.StringType());
+		rules.addType("storage", new Runtime.Serializer.ObjectType(Runtime.Map.create({"class_name": "Runtime.BaseStorage"})));
+		rules.addType("pages", new Runtime.Serializer.MapType(new Runtime.Serializer.ObjectType(Runtime.Map.create({
+			"autocreate": true,
+			"extends": "Runtime.BaseModel",
+			"create": (layout, rules, data) =>
+			{
+				return layout.createWidget(rules.class_name, data);
+			},
+		}))));
 	}
 	
 	
@@ -2822,7 +3362,6 @@ Runtime.BaseLayout = class extends Runtime.BaseModel
 		let page = this.pages.get(class_name);
 		if (!page)
 		{
-			params.set("widget_name", class_name);
 			page = this.createWidget(class_name, params);
 			this.pages.set(class_name, page);
 		}
@@ -2849,7 +3388,34 @@ Runtime.BaseLayout = class extends Runtime.BaseModel
 	/**
 	 * Returns object
 	 */
-	get(name){ return this.storage.frontend_params.get(name); }
+	get(name){ return this.storage.frontend.get(name); }
+	
+	
+	/**
+	 * Returns site name
+	 */
+	getSiteName(){ return ""; }
+	
+	
+	/**
+	 * Create url
+	 */
+	url(name, params)
+	{
+		if (params == undefined) params = null;
+		let router = this.get("router");
+		return router.url(name, params);
+	}
+	
+	
+	/**
+	 * Send api
+	 */
+	sendApi(params)
+	{
+		let api = Runtime.rtl.getContext().provider("api");
+		return api.send(params);
+	}
 	
 	
 	/**
@@ -2888,7 +3454,11 @@ Runtime.BaseLayout = class extends Runtime.BaseModel
 	static getRequiredComponents(component, result, hash)
 	{
 		if (hash.has(component)) return;
-		hash.set(component, true);
+		let components = Runtime.rtl.getParents(component, "Runtime.Component").filter((class_name) => { return !hash.has(class_name); });
+		components.each((class_name) =>
+		{
+			hash.set(class_name, true);
+		});
 		let f = new Runtime.Method(component, "getRequiredComponents");
 		if (f.exists())
 		{
@@ -2902,7 +3472,7 @@ Runtime.BaseLayout = class extends Runtime.BaseModel
 				}
 			}
 		}
-		result.push(component);
+		result.appendItems(components);
 	}
 	
 	
@@ -2915,7 +3485,7 @@ Runtime.BaseLayout = class extends Runtime.BaseModel
 		let res = Runtime.rtl.getContext().hook(Runtime.Hooks.RuntimeHook.COMPONENTS, Runtime.Map.create({
 			"components": this.components.slice(),
 		}));
-		let result_components = new Runtime.Vector();
+		let result_components = Runtime.Vector.create([]);
 		let components = res.get("components");
 		for (let i = 0; i < components.count(); i++)
 		{
@@ -2931,7 +3501,7 @@ Runtime.BaseLayout = class extends Runtime.BaseModel
 	 */
 	getStyle()
 	{
-		let content = new Runtime.Vector();
+		let content = Runtime.Vector.create([]);
 		let components = this.getComponents();
 		for (let i = 0; i < components.count(); i++)
 		{
@@ -2949,7 +3519,7 @@ Runtime.BaseLayout = class extends Runtime.BaseModel
 	{
 		super._init();
 		this.storage = null;
-		this.components = new Runtime.Vector();
+		this.components = Runtime.Vector.create([]);
 		this.pages = new Runtime.Map();
 		this.component = "Runtime.DefaultLayout";
 		this.current_page_model = "";
@@ -3065,12 +3635,14 @@ if (typeof Runtime == 'undefined') Runtime = {};
 Runtime.BaseStorage = class extends Runtime.BaseModel
 {
 	/**
-	 * Serializer model
+	 * Returns object schema
 	 */
-	serialize(serializer, data)
+	static serialize(serializer)
 	{
-		super.serialize(serializer, data);
-		serializer.process(this, "frontend_params", data);
+		super.serialize(serializer);
+		serializer.addType("frontend", new Runtime.Serializer.MapType(new Runtime.Serializer.ObjectType(Runtime.Map.create({
+			"autocreate": true,
+		}))));
 	}
 	
 	
@@ -3079,7 +3651,7 @@ Runtime.BaseStorage = class extends Runtime.BaseModel
 	 */
 	set(key, value)
 	{
-		this.frontend_params.set(key, value);
+		this.frontend.set(key, value);
 	}
 	
 	
@@ -3088,7 +3660,7 @@ Runtime.BaseStorage = class extends Runtime.BaseModel
 	{
 		super._init();
 		this.widget_name = "storage";
-		this.frontend_params = new Runtime.Map();
+		this.frontend = new Runtime.Map();
 	}
 	static getClassName(){ return "Runtime.BaseStorage"; }
 	static getMethodsList(){ return null; }
@@ -3096,6 +3668,142 @@ Runtime.BaseStorage = class extends Runtime.BaseModel
 	static getInterfaces(){ return []; }
 };
 window["Runtime.BaseStorage"] = Runtime.BaseStorage;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+Runtime.BusHttp = class extends Runtime.BaseProvider
+{
+	/**
+	 * Send api to frontend
+	 */
+	async send(params)
+	{
+		let service = params.get("service", "");
+		let api_name = params.get("api_name", "");
+		let method_name = params.get("method_name", "");
+		let data = params.get("data", null);
+		/* Get route prefix */
+		let api_kind = "api";
+		let route_prefix = Runtime.rtl.getContext().env("ROUTE_PREFIX");
+		route_prefix = Runtime.rs.removeFirstSlash(route_prefix);
+		route_prefix = Runtime.rs.removeLastSlash(route_prefix);
+		/* Get api url */
+		let api_url_arr = Runtime.Vector.create([
+			route_prefix,
+			api_kind,
+			api_name,
+			method_name,
+		]);
+		api_url_arr = api_url_arr.filter((s) => { return s != ""; });
+		let api_url = "/" + String(api_url_arr.join("/"));
+		let res = new Runtime.ApiResult();
+		/* Call api before hook */
+		let d = Runtime.rtl.getContext().hook(Runtime.Hooks.RuntimeHook.SEND_API_BEFORE, Runtime.Map.create({
+			"api_url": api_url,
+			"service": service,
+			"api_name": api_name,
+			"method_name": method_name,
+			"params": params,
+			"data": data,
+		}));
+		api_url = d.get("api_url");
+		/* Create curl */
+		let curl = new Runtime.Curl(api_url, Runtime.Map.create({
+			"post": d.get("data"),
+		}));
+		/* Send curl */
+		try
+		{
+			await curl.send();
+		}
+		catch (_ex)
+		{
+			if (_ex instanceof Runtime.Exceptions.CurlException)
+			{
+				var e = _ex;
+				res.exception(e);
+			}
+			else
+			{
+				throw _ex;
+			}
+		}
+		/* Get answer */
+		let answer = Runtime.rtl.jsonDecode(curl.response);
+		if (answer && answer instanceof Runtime.Map)
+		{
+			res.importContent(answer);
+		}
+		else
+		{
+			res.ob_content = curl.response;
+		}
+		/* Print content */
+		if (Runtime.rtl.getContext().env("DEBUG") && res.ob_content)
+		{
+			Runtime.rtl.error(res.ob_content);
+		}
+		/* Print exception */
+		if (Runtime.rtl.getContext().env("DEBUG") && res.isException() && res.error_trace)
+		{
+			let arr = Runtime.Vector.create([
+				"Error message: " + String(res.message),
+				"in file " + String(res.error_file) + String(":") + String(res.error_line),
+			]);
+			arr.appendItems(res.error_trace.map((value, pos) => { return pos + 1 + String(") ") + String(value); }));
+			Runtime.rtl.error(Runtime.rs.join("\n", arr));
+		}
+		return res;
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+	}
+	static getClassName(){ return "Runtime.BusHttp"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return ["Runtime.BusInterface"]; }
+};
+window["Runtime.BusHttp"] = Runtime.BusHttp;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+
 "use strict;"
 /*!
  *  BayLang Technology
@@ -3145,7 +3853,7 @@ Runtime.Listener = class extends Runtime.BaseObject
 		if (!(f instanceof Runtime.Method)) return;
 		if (!this.listeners.has(message_name))
 		{
-			this.clearListener(message_name);
+			this.clear(message_name);
 		}
 		let chain = this.listeners.get(message_name);
 		chain.add(f, priority);
@@ -3158,11 +3866,11 @@ Runtime.Listener = class extends Runtime.BaseObject
 	 */
 	emit(message)
 	{
-		if (message.src == null)
+		if (message.model == null)
 		{
-			message.src = this.object;
+			message.model = this.object;
 		}
-		this.emitMessage(message.getClassName(), message);
+		this.emitMessage(message.constructor.getClassName(), message);
 		this.emitMessage(message.name, message);
 	}
 	
@@ -3172,11 +3880,11 @@ Runtime.Listener = class extends Runtime.BaseObject
 	 */
 	async emitAsync(message)
 	{
-		if (message.src == null)
+		if (message.model == null)
 		{
-			message.src = this.object;
+			message.model = this.object;
 		}
-		let res1 = this.emitMessage(message.getClassName(), message);
+		let res1 = this.emitMessage(message.constructor.getClassName(), message);
 		let res2 = this.emitMessage(message.name, message);
 		if (res1 instanceof Promise) await res1;
 		if (res2 instanceof Promise) await res2;
@@ -3190,7 +3898,7 @@ Runtime.Listener = class extends Runtime.BaseObject
 	{
 		if (!this.listeners.has(message_name)) return;
 		let chain = this.listeners.get(message_name);
-		return chain.apply(new Runtime.Vector(message));
+		return chain.apply(Runtime.Vector.create([message]));
 	}
 	
 	
@@ -3379,7 +4087,8 @@ Runtime.Chain = class extends Runtime.Method
 		{
 			let item = this.chain.get(i);
 			let f = item.get("method");
-			f.apply(args);
+			if (f instanceof Runtime.Method) f.apply(args);
+			else Runtime.rtl.apply(f, args);
 		}
 	}
 	
@@ -3388,7 +4097,7 @@ Runtime.Chain = class extends Runtime.Method
 	_init()
 	{
 		super._init();
-		this.chain = new Runtime.Vector();
+		this.chain = Runtime.Vector.create([]);
 	}
 	static getClassName(){ return "Runtime.Chain"; }
 	static getMethodsList(){ return null; }
@@ -3429,7 +4138,9 @@ Runtime.ChainAsync = class extends Runtime.Chain
 			{
 				let item = this.chain.get(i);
 				let f = item.get("method");
-				let res = f.apply(args);
+				let res = null;
+				if (f instanceof Runtime.Method) res = f.apply(args);
+				else res = Runtime.rtl.apply(f, args);
 				if (res instanceof Promise) await res;
 			}
 		};
@@ -3482,6 +4193,26 @@ Runtime.Component = {
 	},
 	methods:
 	{
+		renderWidget: function(model, attrs)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			if (model)
+			{
+				let component = model.component;
+				if (!attrs)
+				{
+					attrs = new Runtime.Map();
+				}
+				
+				/* Element component */
+				__v.element(component, new Runtime.Map({"model": model}).concat(attrs));
+			}
+			
+			return __v;
+		},
 		render: function()
 		{
 			const rs = use("Runtime.rs");
@@ -3490,12 +4221,21 @@ Runtime.Component = {
 			return __v;
 		},
 		/**
+		 * Returns true if slot is exists
+		 */
+		slot: function(name)
+		{
+			return this.$slots[name] != undefined;
+		},
+		/**
 		 * Render slot
 		 */
-		renderSlot: function(slot_name)
+		renderSlot: function(slot_name, args)
 		{
-			var f = this.$slots[slot_name];
-	return f ? f() : null;
+			if (args == undefined) args = null;
+			if (!args) args = [];
+	var f = this.$slots[slot_name];
+	return f ? f.apply(null, args) : null;
 		},
 		/**
 		 * Returns parent
@@ -3518,6 +4258,13 @@ Runtime.Component = {
 		{
 			message.src = this;
 	this.$emit(message.name, message);
+		},
+		/**
+		 * Next tick
+		 */
+		nextTick: function(f)
+		{
+			this.$nextTick(f);
 		},
 		hash: function(s, f){ if (f == undefined) f = null;return f; },
 		getClassName: function(){ return "Runtime.Component"; },
@@ -3884,9 +4631,9 @@ Runtime.Context = class extends Runtime.BaseObject
 		super._init();
 		this.environments = new Runtime.Map();
 		this.providers = new Runtime.Map();
-		this.modules = new Runtime.Vector();
-		this.entities = new Runtime.Vector();
-		this.cli_args = new Runtime.Vector();
+		this.modules = Runtime.Vector.create([]);
+		this.entities = Runtime.Vector.create([]);
+		this.cli_args = Runtime.Vector.create([]);
 		this.base_path = "";
 		this.start_time = 0;
 		this.initialized = false;
@@ -3931,6 +4678,12 @@ Runtime.Curl = class extends Runtime.BaseObject
 		if (params == null) return;
 		if (params.has("post")) this.post = params.get("post");
 	}
+	
+	
+	/**
+	 * Returns true if curl is success
+	 */
+	isSuccess(){ return this.code == 200; }
 	
 	
 	/**
@@ -3986,16 +4739,16 @@ Object.assign(Runtime.Curl.prototype,
 				this.buildPostData(result, this.getKey(key, i), value[i]);
 			}
 		}
-		else if (value instanceof Runtime.Dict)
+		else if (value instanceof Runtime.Map)
 		{
-			var keys = value.keys();
+			var keys = Runtime.rtl.list(value.keys());
 			for (var i=0; i<keys.length; i++)
 			{
 				var name = keys.get(i);
 				this.buildPostData(result, this.getKey(key, name), value.get(name));
 			}
 		}
-		else
+		else if (value !== null)
 		{
 			result.append(key, value);
 		}
@@ -4272,7 +5025,7 @@ Runtime.DateTime = class extends Runtime.BaseObject
 		let s = this.s < 10 ? "0" + String(this.s) : "" + String(this.s);
 		/* Get offset */
 		let offset = this.o * 60;
-		let offset_h = Runtime.Math.abs(Runtime.Math.floor(offset / 60));
+		let offset_h = Runtime.rtl.abs(Runtime.rtl.floor(offset / 60));
 		let offset_m = offset % 60;
 		offset_h = offset_h < 10 ? "0" + String(offset_h) : "" + String(offset_h);
 		offset_m = offset_m < 10 ? "0" + String(offset_m) : "" + String(offset_m);
@@ -4311,7 +5064,7 @@ Runtime.DateTime = class extends Runtime.BaseObject
 	/**
 	 * Returns date time string
 	 */
-	getDateTimeString()
+	format()
 	{
 		let m = this.m < 10 ? "0" + String(this.m) : "" + String(this.m);
 		let d = this.d < 10 ? "0" + String(this.d) : "" + String(this.d);
@@ -4392,7 +5145,7 @@ Runtime.DateTime = class extends Runtime.BaseObject
 	toObject()
 	{
 		var dt = new Date(this.y, this.m - 1, this.d, this.h, this.i, this.s);
-		offset = dt.getTimezoneOffset() + this.o * 60;
+		var offset = dt.getTimezoneOffset() + this.o * 60;
 		dt = this.constructor.modify(dt, -offset * 60);
 		return dt;
 	}
@@ -4534,11 +5287,19 @@ Runtime.DefaultLayout = {
 			
 			__v.push(this.renderComponents(this.getComponents(Runtime.Hooks.RuntimeHook.LAYOUT_FOOTER)));
 			
+			return __v;
+		},
+		renderMountApp: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
 			/* Element script */
 			let __v0 = __v.element("script");
 			__v0.push("var app_data =");
 			__v0.push(Runtime.rtl.jsonEncode(this.container.getData()));
-			__v0.push(";\n\t\tRuntime.rtl.mount(app_data, document.querySelector(\".root_container\"), function (result){\n\t\t\twindow[\"app\"] = result.get(\"app\");\n\t\t\twindow[\"app_layout\"] = result.get(\"layout\");\n\t\t});");
+			__v0.push(";\n\t\tdocument.addEventListener(\"DOMContentLoaded\", function(){\n\t\t\tRuntime.rtl.mount(app_data, document.querySelector(\".root_container\"), function (result){\n\t\t\t\twindow[\"app\"] = result.get(\"app\");\n\t\t\t\twindow[\"app_layout\"] = result.get(\"layout\");\n\t\t\t});\n\t\t});");
 			
 			return __v;
 		},
@@ -4575,6 +5336,7 @@ Runtime.DefaultLayout = {
 			let __v3 = __v2.element("div", new Runtime.Map({"class": rs.className(["root_container", componentHash])}));
 			__v3.push(this.render());
 			__v2.push(this.renderFooter());
+			__v2.push(this.renderMountApp());
 			
 			return __v;
 		},
@@ -4582,7 +5344,7 @@ Runtime.DefaultLayout = {
 		{
 			let d = Runtime.rtl.getContext().hook(name, Runtime.Map.create({
 				"layout": this.layout,
-				"components": new Runtime.Vector(),
+				"components": Runtime.Vector.create([]),
 			}));
 			return d.get("components");
 		},
@@ -4631,7 +5393,7 @@ Runtime.Message = class extends Runtime.BaseObject
 		super._init();
 		this.data = null;
 		this.name = "";
-		this.src = null;
+		this.model = null;
 	}
 	static getClassName(){ return "Runtime.Message"; }
 	static getMethodsList(){ return null; }
@@ -4875,7 +5637,7 @@ Runtime.RenderContainer = class extends Runtime.BaseObject
 			"class_name": class_name,
 			"layout_name": layout_name,
 		}));
-		this.layout = Runtime.rtl.newInstance(params.get("class_name"), new Runtime.Vector(params));
+		this.layout = Runtime.rtl.newInstance(params.get("class_name"), Runtime.Vector.create([params]));
 		this.layout.name = layout_name;
 		/* Call create layout */
 		Runtime.rtl.getContext().hook(Runtime.Hooks.RuntimeHook.CREATE_LAYOUT, Runtime.Map.create({
@@ -4934,7 +5696,7 @@ Runtime.RenderContainer = class extends Runtime.BaseObject
 		if (page_model)
 		{
 			await page_model.loadData(this);
-			page_model.buildTitle(this);
+			if (page_model == this.layout.getPageModel()) page_model.buildTitle(this);
 		}
 	}
 	
@@ -4953,12 +5715,18 @@ Runtime.RenderContainer = class extends Runtime.BaseObject
 	 */
 	getData()
 	{
-		let serializer = new Runtime.Serializer();
-		let layout_data = serializer.encode(this.layout);
+		let layout_data = Runtime.rtl.serialize(this.layout);
 		let data = Runtime.Map.create({
 			"modules": Runtime.rtl.getContext().modules,
+			"class": this.layout.getClassName(),
 			"layout": layout_data,
-			"storage": new Runtime.Map(),
+			"environments": Runtime.Map.create({
+				"CLOUD_ENV": Runtime.rtl.getContext().env("CLOUD_ENV"),
+				"DEBUG": Runtime.rtl.getContext().env("DEBUG"),
+				"LOCALE": Runtime.rtl.getContext().env("LOCALE"),
+				"TZ": Runtime.rtl.getContext().env("TZ"),
+				"TZ_OFFSET": Runtime.rtl.getContext().env("TZ_OFFSET"),
+			}),
 		});
 		let res = Runtime.rtl.getContext().hook(Runtime.Hooks.RuntimeHook.CREATE_CONTAINER_DATA, Runtime.Map.create({
 			"container": this,
@@ -5044,146 +5812,6 @@ if (typeof Runtime == 'undefined') Runtime = {};
  *  limitations under the License.
  */
 if (typeof Runtime == 'undefined') Runtime = {};
-Runtime.Serializer = class extends Runtime.BaseObject
-{
-	static ASSIGN_DATA = 1;
-	static ENCODE_DATA = 2;
-	
-	
-	isAssign(){ return this.kind == this.constructor.ASSIGN_DATA; }
-	
-	
-	isEncode(){ return this.kind == this.constructor.ENCODE_DATA; }
-	
-	
-	/**
-	 * Assign data to object
-	 */
-	assign(obj, data)
-	{
-		if (!(Runtime.rtl.isImplements(obj, "Runtime.SerializeInterface"))) return;
-		this.kind = this.constructor.ASSIGN_DATA;
-		obj.serialize(this, data);
-	}
-	
-	
-	/**
-	 * Convert value to object
-	 */
-	decode(value, create)
-	{
-		if (create == undefined) create = null;
-		this.kind = this.constructor.ASSIGN_DATA;
-		let new_value = value;
-		if (value instanceof Runtime.Map && value.has("__class_name__"))
-		{
-			let class_name = value.get("__class_name__");
-			new_value = create ? create.apply(new Runtime.Vector(this, value)) : Runtime.rtl.newInstance(class_name);
-			this.assign(new_value, value);
-		}
-		else if (value instanceof Runtime.Vector || value instanceof Runtime.Map)
-		{
-			new_value = value.map((item) =>
-			{
-				let new_item = this.decode(item, create);
-				return new_item;
-			});
-		}
-		return new_value;
-	}
-	
-	
-	/**
-	 * Convert object to Map
-	 */
-	encode(obj)
-	{
-		this.kind = this.constructor.ENCODE_DATA;
-		let data = obj;
-		if (Runtime.rtl.isObject(obj) && Runtime.rtl.isImplements(obj, "Runtime.SerializeInterface"))
-		{
-			data = Runtime.Map.create({
-				"__class_name__": Runtime.rtl.className(obj),
-			});
-			obj.serialize(this, data);
-		}
-		return data;
-	}
-	
-	
-	/**
-	 * Serialize item
-	 */
-	process(obj, field_name, data, create)
-	{
-		if (create == undefined) create = null;
-		if (this.kind == this.constructor.ASSIGN_DATA)
-		{
-			let value = data.get(field_name);
-			let new_value = this.decode(value, create);
-			Runtime.rtl.setAttr(obj, field_name, new_value);
-		}
-		else
-		{
-			let value = Runtime.rtl.attr(obj, field_name);
-			let new_value = value;
-			if (value instanceof Runtime.Vector || value instanceof Runtime.Map)
-			{
-				new_value = value.map((item) => { return this.encode(item); });
-			}
-			else
-			{
-				new_value = this.encode(value);
-			}
-			data.set(field_name, new_value);
-		}
-	}
-	
-	
-	/**
-	 * Copy object
-	 */
-	static copy(obj)
-	{
-		let serializer = new Runtime.Serializer();
-		let data = serializer.encode(obj);
-		let s = Runtime.rtl.jsonEncode(data);
-		data = Runtime.rtl.jsonDecode(s);
-		return serializer.decode(obj);
-	}
-	
-	
-	/* ========= Class init functions ========= */
-	_init()
-	{
-		super._init();
-		this.kind = 0;
-	}
-	static getClassName(){ return "Runtime.Serializer"; }
-	static getMethodsList(){ return null; }
-	static getMethodInfoByName(field_name){ return null; }
-	static getInterfaces(){ return []; }
-};
-window["Runtime.Serializer"] = Runtime.Serializer;
-"use strict;"
-/*!
- *  BayLang Technology
- *
- *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
- */
-if (typeof Runtime == 'undefined') Runtime = {};
 Runtime.ModuleDescription = class
 {
 	/**
@@ -5212,12 +5840,13 @@ Runtime.ModuleDescription = class
 	 */
 	static entities()
 	{
-		return new Runtime.Vector(
+		return Runtime.Vector.create([
 			new Runtime.Entity.Provider("hash", "Runtime.Providers.GlobalHash"),
 			new Runtime.Entity.Provider("output", "Runtime.Providers.OutputProvider"),
 			new Runtime.Entity.Provider("hook", "Runtime.Providers.HookProvider"),
+			new Runtime.Entity.Provider("api", "Runtime.BusHttp"),
 			new Runtime.Entity.Provider("render", "Runtime.Providers.RenderProvider"),
-		);
+		]);
 	}
 	
 	
@@ -5299,7 +5928,7 @@ Runtime.VirtualDom = class extends Runtime.BaseObject
 	element(name, attrs)
 	{
 		if (attrs == undefined) attrs = null;
-		let item = this.constructor.newInstance(new Runtime.Vector(this.component));
+		let item = this.constructor.newInstance(Runtime.Vector.create([this.component]));
 		item.setName(name);
 		item.setAttrs(attrs);
 		if (name == "script" || name == "style") item.is_raw = true;
@@ -5318,6 +5947,7 @@ Runtime.VirtualDom = class extends Runtime.BaseObject
 			this.items.appendItems(content);
 			return;
 		}
+		if (Runtime.rtl.isString(content) && content == "") return;
 		if (!(content instanceof Runtime.VirtualDom) && !Runtime.rtl.isString(content))
 		{
 			content = Runtime.rtl.toStr(content);
@@ -5349,11 +5979,35 @@ Runtime.VirtualDom = class extends Runtime.BaseObject
 	 */
 	render()
 	{
-		let content = new Runtime.Vector();
+		let content = Runtime.Vector.create([]);
 		let provider = new Runtime.Providers.RenderContent();
 		provider.components = Runtime.rtl.getContext().provider("render").components;
 		provider.render(this, content);
 		return Runtime.rs.join("", content);
+	}
+	
+	
+	/**
+	 * Raw string
+	 */
+	static raw(content)
+	{
+		let vdom = new Runtime.VirtualDom();
+		vdom.is_raw = true;
+		vdom.push(content);
+		return vdom;
+	}
+	
+	
+	/**
+	 * Render model
+	 */
+	static renderModel(model)
+	{
+		let vdom = new Runtime.VirtualDom();
+		vdom.setName(model.component);
+		vdom.attrs = Runtime.Map.create({"model": model, "layout": model.layout});
+		return vdom;
 	}
 	
 	
@@ -5364,7 +6018,7 @@ Runtime.VirtualDom = class extends Runtime.BaseObject
 		this.component = null;
 		this.attrs = new Runtime.Map();
 		this.slots = new Runtime.Map();
-		this.items = new Runtime.Vector();
+		this.items = Runtime.Vector.create([]);
 		this.is_raw = false;
 		this.is_render = false;
 		this.is_component = false;
@@ -5403,6 +6057,7 @@ Runtime.Entity.Entity = class extends Runtime.BaseObject
 	 */
 	constructor(obj)
 	{
+		if (obj == undefined) obj = null;
 		super();
 		this._assign_values(obj);
 	}
@@ -5445,42 +6100,29 @@ Runtime.Entity.Factory = class extends Runtime.Entity.Entity
 	/**
 	 * Create factory
 	 */
-	constructor(name, value, params)
+	constructor(name, params)
 	{
-		if (value == undefined) value = null;
 		if (params == undefined) params = null;
 		super(Runtime.Map.create({
 			"name": name,
-			"value": value,
 			"params": params,
 		}));
 	}
 	
 	
 	/**
+	 * Returns class name
+	 */
+	getName(){ return this.name; }
+	
+	
+	/**
 	 * Create new object
 	 */
-	createInstance(params)
+	createInstance()
 	{
-		if (params == undefined) params = null;
-		let instance = null;
-		let class_name = this.value;
-		let factory_params = this.params;
-		if (params)
-		{
-			if (factory_params) factory_params = factory_params.concat(params);
-			else factory_params = params;
-		}
-		if (class_name == null) class_name = this.name;
-		if (class_name instanceof Runtime.BaseObject)
-		{
-			instance = class_name;
-		}
-		else if (Runtime.rtl.isString(class_name))
-		{
-			instance = Runtime.rtl.newInstance(class_name, new Runtime.Vector(factory_params));
-		}
-		return instance;
+		let class_name = this.getName();
+		return Runtime.rtl.newInstance(class_name, Runtime.Vector.create([this.params]));
 	}
 	
 	
@@ -5488,7 +6130,6 @@ Runtime.Entity.Factory = class extends Runtime.Entity.Entity
 	_init()
 	{
 		super._init();
-		this.value = null;
 		this.params = null;
 	}
 	static getClassName(){ return "Runtime.Entity.Factory"; }
@@ -5525,7 +6166,7 @@ Runtime.Entity.Hook = class extends Runtime.Entity.Factory
 	constructor(name, params)
 	{
 		if (params == undefined) params = null;
-		super(name, null, params);
+		super(name, params);
 	}
 	
 	
@@ -5563,10 +6204,29 @@ if (typeof Runtime == 'undefined') Runtime = {};
 if (typeof Runtime.Entity == 'undefined') Runtime.Entity = {};
 Runtime.Entity.Provider = class extends Runtime.Entity.Factory
 {
+	/**
+	 * Create factory
+	 */
+	constructor(name, value, params)
+	{
+		if (value == undefined) value = "";
+		if (params == undefined) params = null;
+		super(name, params);
+		this.value = value;
+	}
+	
+	
+	/**
+	 * Returns class name
+	 */
+	getName(){ return this.value ? this.value : this.name; }
+	
+	
 	/* ========= Class init functions ========= */
 	_init()
 	{
 		super._init();
+		this.value = null;
 	}
 	static getClassName(){ return "Runtime.Entity.Provider"; }
 	static getMethodsList(){ return null; }
@@ -5613,9 +6273,6 @@ Runtime.Hooks.BaseHook = class extends Runtime.BaseObject
 	 */
 	initParams(params)
 	{
-		if (params == null) return;
-		this.hook = params.get("hook");
-		this.provider = params.get("provider");
 	}
 	
 	
@@ -5644,7 +6301,6 @@ Runtime.Hooks.BaseHook = class extends Runtime.BaseObject
 	_init()
 	{
 		super._init();
-		this.hook = null;
 		this.provider = null;
 	}
 	static getClassName(){ return "Runtime.Hooks.BaseHook"; }
@@ -5690,6 +6346,7 @@ Runtime.Hooks.RuntimeHook = class extends Runtime.Hooks.BaseHook
 	static CREATE_CONTAINER_DATA = "runtime::create_container_data";
 	static CREATE_LAYOUT = "runtime::create_layout";
 	static CHANGE_LAYOUT = "runtime::change_layout";
+	static SEND_API_BEFORE = "runtime::send_api_before";
 	static TITLE = "runtime::title";
 	
 	
@@ -5699,12 +6356,12 @@ Runtime.Hooks.RuntimeHook = class extends Runtime.Hooks.BaseHook
 	register_hooks()
 	{
 		super.register_hooks();
-		this.provider.setAsync(new Runtime.Vector(
+		this.provider.setAsync(Runtime.Vector.create([
 			this.constructor.INIT,
 			this.constructor.START,
 			this.constructor.LAUNCHED,
 			this.constructor.RUN,
-		));
+		]));
 	}
 	
 	
@@ -5794,10 +6451,8 @@ Runtime.Providers.HookProvider = class extends Runtime.BaseProvider
 		for (let i = 0; i < hooks.count(); i++)
 		{
 			let hook = hooks[i];
-			let base_hook = hook.createInstance(Runtime.Map.create({
-				"hook": hook,
-				"provider": this,
-			}));
+			let base_hook = hook.createInstance();
+			base_hook.provider = this;
 			base_hook.register_hooks();
 			this.base_hooks.push(base_hook);
 		}
@@ -5894,12 +6549,12 @@ Runtime.Providers.HookProvider = class extends Runtime.BaseProvider
 		{
 			let f = async () =>
 			{
-				await chain.apply(new Runtime.Vector(params));
+				await chain.apply(Runtime.Vector.create([params]));
 				return params;
 			};
 			return f();
 		}
-		chain.apply(new Runtime.Vector(params));
+		chain.apply(Runtime.Vector.create([params]));
 		return params;
 	}
 	
@@ -5908,7 +6563,7 @@ Runtime.Providers.HookProvider = class extends Runtime.BaseProvider
 	_init()
 	{
 		super._init();
-		this.base_hooks = new Runtime.Vector();
+		this.base_hooks = Runtime.Vector.create([]);
 		this.chains = new Runtime.Map();
 		this.async_hooks = new Runtime.Map();
 	}
@@ -6173,11 +6828,10 @@ Runtime.Providers.RenderProvider = class extends Runtime.BaseProvider
 	 */
 	createLayout(app_data)
 	{
+		let class_name = app_data.get("class");
 		let layout_data = app_data.get("layout");
-		let class_name = layout_data.get("__class_name__");
 		let layout = Runtime.rtl.newInstance(class_name);
-		let serializer = new Runtime.Serializer();
-		serializer.assign(layout, layout_data);
+		Runtime.rtl.assign(layout, layout_data);
 		return window["Vue"].reactive(layout);
 	}
 	
@@ -6251,6 +6905,7 @@ Runtime.Providers.RenderProvider = class extends Runtime.BaseProvider
 		{
 			let name = vdom.name;
 			if (this.components.has(name)) name = this.components.get(name);
+			if (name == "TransitionGroup") return Vue.TransitionGroup;
 			return Runtime.rtl.findClass(name);
 		}
 		return vdom.name;
@@ -6263,7 +6918,7 @@ Runtime.Providers.RenderProvider = class extends Runtime.BaseProvider
 	render(vdom)
 	{
 		if (!(vdom instanceof Runtime.VirtualDom)) return vdom;
-		let content = new Runtime.Vector();
+		let content = Runtime.Vector.create([]);
 		if (!vdom.attrs.has("@raw"))
 		{
 			for (let i = 0; i < vdom.items.count(); i++)
@@ -6281,24 +6936,23 @@ Runtime.Providers.RenderProvider = class extends Runtime.BaseProvider
 		let children = content;
 		if (vdom.is_component)
 		{
-			let slots = vdom.slots.map((f) =>
-			{
-				return () =>
-				{
-					let vdom = f();
-					return this.render(vdom);
+			children = vdom.slots.map(function (f){
+				return (...args) => {
+					return Runtime.rtl.render(f.apply(null, args));
 				};
-			});
-			children = slots.toObject();
+			}).toObject();
 		}
-		if (children instanceof Runtime.Vector) children = children.flatten();
+		if (children instanceof Runtime.Vector)
+		{
+			children = children.flatten().filter((item) => { return item != null && item != ""; });
+		}
 		let attrs = vdom.attrs;
 		if (attrs instanceof Runtime.Map)
 		{
 			attrs = attrs.mapWithKeys((value, key) =>
 			{
 				if (key == "@ref") key = "ref";
-				return new Runtime.Vector(value, key);
+				return Runtime.Vector.create([value, key]);
 			}).filter((value, key) => { return Runtime.rs.charAt(key, 0) != "@"; });
 			attrs = attrs.toObject();
 			if (vdom.attrs.has("@raw"))
@@ -6343,171 +6997,193 @@ window["Runtime.Providers.RenderProvider"] = Runtime.Providers.RenderProvider;
  *  limitations under the License.
  */
 if (typeof Runtime == 'undefined') Runtime = {};
-if (typeof Runtime.Web == 'undefined') Runtime.Web = {};
-Runtime.Web.ApiResult = class extends Runtime.BaseObject
+if (typeof Runtime.Serializer == 'undefined') Runtime.Serializer = {};
+Runtime.Serializer.Allowed = class extends Runtime.BaseObject
 {
 	/**
-	 * Returns true if error
+	 * Create object
 	 */
-	isError(){ return this.code < 0; }
-	
-	
-	/**
-	 * Returns true if is exception
-	 */
-	isException(){ return this.is_exception; }
-	
-	
-	/**
-	 * Returns true if success
-	 */
-	isSuccess(){ return this.code > 0; }
-	
-	
-	/**
-	 * Get error message
-	 */
-	getErrorMessage(){ return this.message; }
-	
-	
-	/**
-	 * Get error code
-	 */
-	getErrorCode(){ return this.code; }
-	
-	
-	/**
-	 * Returns content
-	 */
-	getContent()
+	constructor(items)
 	{
-		let res = Runtime.Map.create({
-			"api_name": this.api_name,
-			"method_name": this.method_name,
-			"code": this.code,
-			"message": this.message,
-			"data": this.data,
-		});
-		if (this.error_name != "") res.set("error_name", this.error_name);
-		if (this.error_file != "") res.set("error_file", this.error_file);
-		if (this.error_line != "") res.set("error_line", this.error_line);
-		if (this.error_pos != "") res.set("error_pos", this.error_pos);
-		if (this.error_trace != "") res.set("error_trace", this.error_trace);
-		return res;
+		super();
+		this.items = items;
 	}
 	
 	
 	/**
-	 * Import content
+	 * Filter value
 	 */
-	importContent(content)
+	filter(value, errors)
 	{
-		this.api_name = content.get("api_name", "");
-		this.method_name = content.get("method_name", "");
-		this.data = content.get("data", null);
-		this.code = content.get("code", -1);
-		this.message = content.get("message", "Unknown error");
-		this.ob_content = content.get("ob_content", "");
-		this.error_name = content.get("error_name", "");
-		this.error_file = content.get("error_file", "");
-		this.error_line = content.get("error_line", "");
-		this.error_trace = content.get("error_trace", new Runtime.Vector());
-		this.error_pos = content.get("error_pos", "");
-		this.is_exception = this.error_file != "";
+		if (value === null) return null;
+		if (this.items.indexOf(value) == -1)
+		{
+			errors.push("Value not allowed");
+		}
+		return value;
 	}
 	
 	
 	/**
-	 * Set data
+	 * Returns data
 	 */
-	setData(data)
+	encode(value){ return value; }
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
 	{
-		if (data == null) return;
-		if (data instanceof Runtime.Dict)
-		{
-			let keys = data.keys();
-			for (let i = 0; i < keys.count(); i++)
-			{
-				let key = keys.get(i);
-				this.data.set(key, data.get(key));
-			}
-		}
-		else
-		{
-			this.data = data;
-		}
+		super._init();
+		this.items = Runtime.Vector.create([]);
+	}
+	static getClassName(){ return "Runtime.Serializer.Allowed"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return ["Runtime.Serializer.BaseType"]; }
+};
+window["Runtime.Serializer.Allowed"] = Runtime.Serializer.Allowed;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Serializer == 'undefined') Runtime.Serializer = {};
+
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Serializer == 'undefined') Runtime.Serializer = {};
+Runtime.Serializer.BooleanType = class extends Runtime.BaseObject
+{
+	/**
+	 * Constructor
+	 */
+	constructor(params)
+	{
+		if (params == undefined) params = null;
+		super();
+		if (!params) return;
+		if (params.has("convert")) this.convert = params.get("convert");
+		if (params.has("default")) this.default_value = params.get("default");
 	}
 	
 	
 	/**
-	 * Setup success
+	 * Filter value
 	 */
-	success(data)
+	filter(value, errors)
 	{
-		if (data == undefined) data = null;
-		this.code = Runtime.rtl.ERROR_OK;
-		this.message = "Ok";
-		if (!data) return;
-		/* Set code */
-		if (data.has("code")) this.code = data.get("code");
-		else this.code = Runtime.rtl.ERROR_OK;
-		/* Set message */
-		if (data.has("message")) this.message = data.get("message");
-		else this.message = "Ok";
-		/* Set data */
-		if (data.has("data")) this.setData(data.get("data"));
+		if (value === null)
+		{
+			if (!this.convert) errors.push(new Runtime.Serializer.TypeError("Does not boolean"));
+			return this.default_value;
+		}
+		if (this.convert && (Runtime.rtl.isInteger(value) || Runtime.rtl.isBoolean(value)))
+		{
+			if (value == 1) return true;
+			return false;
+		}
+		if (value == "true") return true;
+		if (value == "false") return false;
+		errors.push(new Runtime.Serializer.TypeError("Does not boolean"));
+		return false;
 	}
 	
 	
 	/**
-	 * Setup exception
+	 * Returns data
 	 */
-	exception(e)
+	encode(value){ return value; }
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
 	{
-		this.code = e.getErrorCode();
-		this.message = e.getErrorMessage();
-		this.error_name = e.getClassName();
-		this.error_file = e.getFileName();
-		this.error_line = e.getErrorLine();
-		this.error_pos = e.getErrorPos();
-		if (Runtime.rtl.getContext().env("DEBUG"))
+		super._init();
+		this.convert = true;
+		this.default_value = false;
+	}
+	static getClassName(){ return "Runtime.Serializer.BooleanType"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return ["Runtime.Serializer.BaseType"]; }
+};
+window["Runtime.Serializer.BooleanType"] = Runtime.Serializer.BooleanType;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Serializer == 'undefined') Runtime.Serializer = {};
+Runtime.Serializer.DateTimeType = class extends Runtime.BaseObject
+{
+	/**
+	 * Filter value
+	 */
+	filter(value, errors)
+	{
+		if (value === null) return null;
+		if (value instanceof Runtime.DateTime) return value;
+		if (!(value instanceof Runtime.Map))
 		{
-			this.error_trace = e.getTraceCollection();
+			errors.push("Must be Map");
+			return null;
 		}
-		this.is_exception = true;
+		return new Runtime.DateTime(value);
 	}
 	
 	
 	/**
-	 * Setup fail
+	 * Returns data
 	 */
-	fail(data)
+	encode(value)
 	{
-		if (data == undefined) data = null;
-		this.code = Runtime.rtl.ERROR_UNKNOWN;
-		this.message = "Unknown error";
-		if (data instanceof Runtime.Exceptions.AbstractException)
-		{
-			this.code = data.getErrorCode();
-			this.message = data.getErrorMessage();
-			this.error_name = data.getClassName();
-		}
-		else if (data instanceof Runtime.Dict)
-		{
-			/* Set code */
-			if (data.has("code")) this.code = data.get("code");
-			else this.code = Runtime.rtl.ERROR_UNKNOWN;
-			/* Set message */
-			if (data.has("message")) this.message = data.get("message");
-			else this.message = "Error";
-			/* Set data */
-			if (data.has("data")) this.setData(data.get("data"));
-		}
-		else
-		{
-			this.code = Runtime.rtl.ERROR_UNKNOWN;
-			this.message = "Error";
-		}
+		if (value === null) return null;
+		return value.toMap();
 	}
 	
 	
@@ -6515,25 +7191,13 @@ Runtime.Web.ApiResult = class extends Runtime.BaseObject
 	_init()
 	{
 		super._init();
-		this.code = 0;
-		this.message = "";
-		this.data = new Runtime.Map();
-		this.api_name = "";
-		this.method_name = "";
-		this.ob_content = "";
-		this.error_name = null;
-		this.error_file = "";
-		this.error_line = "";
-		this.error_pos = 0;
-		this.error_trace = null;
-		this.is_exception = false;
 	}
-	static getClassName(){ return "Runtime.Web.ApiResult"; }
+	static getClassName(){ return "Runtime.Serializer.DateTimeType"; }
 	static getMethodsList(){ return null; }
 	static getMethodInfoByName(field_name){ return null; }
-	static getInterfaces(){ return []; }
+	static getInterfaces(){ return ["Runtime.Serializer.BaseType"]; }
 };
-window["Runtime.Web.ApiResult"] = Runtime.Web.ApiResult;
+window["Runtime.Serializer.DateTimeType"] = Runtime.Serializer.DateTimeType;
 "use strict;"
 /*!
  *  BayLang Technology
@@ -6553,48 +7217,122 @@ window["Runtime.Web.ApiResult"] = Runtime.Web.ApiResult;
  *  limitations under the License.
  */
 if (typeof Runtime == 'undefined') Runtime = {};
-if (typeof Runtime.Web == 'undefined') Runtime.Web = {};
-Runtime.Web.Bus = class
+if (typeof Runtime.Serializer == 'undefined') Runtime.Serializer = {};
+Runtime.Serializer.ConstantType = class extends Runtime.BaseObject
 {
 	/**
-	 * Returns BusInterface
+	 * Create object
 	 */
-	static getApi(service)
+	constructor(value)
 	{
-		return new Runtime.Web.BusHttp();
+		super();
+		this.value = value;
 	}
 	
 	
 	/**
-	 * Parse api name
+	 * Filter value
 	 */
-	static parseName(api_name)
+	filter(value, errors){ return this.value; }
+	
+	
+	/**
+	 * Returns data
+	 */
+	encode(value){ return this.value; }
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
 	{
-		let arr = Runtime.rs.split("/", api_name);
-		if (arr.count() == 1)
+		super._init();
+		this.value = null;
+	}
+	static getClassName(){ return "Runtime.Serializer.ConstantType"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return ["Runtime.Serializer.BaseType"]; }
+};
+window["Runtime.Serializer.ConstantType"] = Runtime.Serializer.ConstantType;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Serializer == 'undefined') Runtime.Serializer = {};
+Runtime.Serializer.IntegerType = class extends Runtime.BaseObject
+{
+	/**
+	 * Create type
+	 */
+	constructor(params)
+	{
+		if (params == undefined) params = null;
+		super();
+		if (!params) return;
+		if (params.has("convert")) this.conver = params.get("convert");
+		if (params.has("default")) this.default_value = params.get("default");
+	}
+	
+	
+	/**
+	 * Filter type
+	 */
+	filter(value, errors)
+	{
+		if (value === null) return this.default_value;
+		if (this.convert)
 		{
-			return Runtime.Map.create({
-				"service": "app",
-				"api_name": arr.get(0),
-			});
+			if (Runtime.rtl.isInteger(value) || Runtime.rtl.isBoolean(value)) value = Runtime.rtl.toInt(value);
+			else if (Runtime.rtl.isString(value)) value = Runtime.rtl.toInt(value);
 		}
-		return Runtime.Map.create({
-			"service": arr.get(0),
-			"api_name": arr.get(1),
-		});
+		if (!Runtime.rtl.isInteger(value))
+		{
+			errors.push(new Runtime.Serializer.TypeError("Does not integer"));
+			return "";
+		}
+		return value;
+	}
+	
+	
+	/**
+	 * Serialize
+	 */
+	encode(value)
+	{
+		if (Runtime.rtl.isInteger(value)) return value;
+		if (Runtime.rtl.isBoolean(value) || Runtime.rtl.isString(value)) return Runtime.rtl.toInt(value);
+		return 0;
 	}
 	
 	
 	/* ========= Class init functions ========= */
 	_init()
 	{
+		super._init();
+		this.convert = true;
+		this.default_value = 0;
 	}
-	static getClassName(){ return "Runtime.Web.Bus"; }
+	static getClassName(){ return "Runtime.Serializer.IntegerType"; }
 	static getMethodsList(){ return null; }
 	static getMethodInfoByName(field_name){ return null; }
-	static getInterfaces(){ return []; }
+	static getInterfaces(){ return ["Runtime.Serializer.BaseType"]; }
 };
-window["Runtime.Web.Bus"] = Runtime.Web.Bus;
+window["Runtime.Serializer.IntegerType"] = Runtime.Serializer.IntegerType;
 "use strict;"
 /*!
  *  BayLang Technology
@@ -6614,99 +7352,117 @@ window["Runtime.Web.Bus"] = Runtime.Web.Bus;
  *  limitations under the License.
  */
 if (typeof Runtime == 'undefined') Runtime = {};
-if (typeof Runtime.Web == 'undefined') Runtime.Web = {};
-Runtime.Web.BusHttp = class extends Runtime.BaseObject
+if (typeof Runtime.Serializer == 'undefined') Runtime.Serializer = {};
+Runtime.Serializer.MapType = class extends Runtime.BaseObject
 {
 	/**
-	 * Send api to frontend
+	 * Fields
 	 */
-	async send(params)
+	constructor(params)
 	{
-		let service = "";
-		let api_name = params.get("api_name", "");
-		let method_name = params.get("method_name", "");
-		let data = params.get("data", null);
-		/* Get api name */
-		let name = Runtime.Web.Bus.parseName(api_name);
-		service = name.get("service");
-		api_name = name.get("api_name");
-		/* Get route prefix */
-		let route_prefix = Runtime.rtl.getContext().env("ROUTE_PREFIX");
-		route_prefix = Runtime.rs.removeFirstSlash(route_prefix);
-		/* Get api url */
-		let api_url_arr = new Runtime.Vector(
-			route_prefix,
-			this.kind,
-			service,
-			api_name,
-			method_name,
-		);
-		api_url_arr = api_url_arr.filter((s) => { return s != ""; });
-		let api_url = "/" + String(api_url_arr.join("/"));
-		let res = new Runtime.Web.ApiResult();
-		try
+		if (params == undefined) params = null;
+		super();
+		if (Runtime.rtl.isImplements(params, "Runtime.Serializer.BaseType")) this.fields = Runtime.Vector.create([params]);
+		else if (params instanceof Runtime.Vector) this.fields = params;
+		else if (params instanceof Runtime.Map) this.items = params;
+	}
+	
+	
+	/**
+	 * Add type
+	 */
+	addType(key, rule)
+	{
+		if (!this.items.has(key)) this.items.set(key, Runtime.Vector.create([]));
+		let items = this.items.get(key);
+		items.push(rule);
+	}
+	
+	
+	/**
+	 * Returns rules
+	 */
+	getRules(field_name)
+	{
+		if (this.items && this.items.has(field_name))
 		{
-			let post_data = Runtime.Map.create({
-				"service": service,
-				"api_name": api_name,
-				"method_name": method_name,
-				"data": data,
-			});
-			/* Call api before hook */
-			let d = Runtime.rtl.getContext().callHook(Runtime.Web.Hooks.AppHook.CALL_API_BEFORE, Runtime.Map.create({
-				"api_url": api_url,
-				"post_data": post_data,
-				"params": params,
-			}));
-			api_url = d.get("api_url");
-			post_data = d.get("post_data");
-			/* Send curl */
-			let curl = new Runtime.Curl(api_url, Runtime.Map.create({
-				"post": post_data,
-			}));
-			let response = await curl.send();
-			/* Get answer */
-			let answer = Runtime.rtl.json_decode(response, Runtime.rtl.ALLOW_OBJECTS);
-			if (answer && answer instanceof Runtime.Dict)
-			{
-				res.importContent(answer);
-			}
-			else
-			{
-				res.exception(new Runtime.Exceptions.AbstractException("Api response error"));
-			}
-			/* Print exception */
-			if (Runtime.rtl.getContext().env("DEBUG") && res.isException() && answer)
-			{
-				let arr = new Runtime.Vector();
-				arr.push(res.error_name + String(" ") + String("in file ") + String(res.error_file) + String(":") + String(res.error_line));
-				arr.appendItems(res.error_trace.map((value, pos) => { return pos + 1 + String(") ") + String(value); }));
-				Runtime.io.print_error(Runtime.rs.join("\n", arr));
-			}
+			let fields = this.items.get(field_name);
+			if (!(fields instanceof Runtime.Vector)) fields = Runtime.Vector.create([fields]);
+			return fields;
 		}
-		catch (_ex)
+		if (this.fields) return this.fields;
+		return null;
+	}
+	
+	
+	/**
+	 * Returns keys
+	 */
+	keys(value){ if (value == undefined) value = null;return Runtime.rtl.list((this.fields && value) ? value.keys() : this.items.keys()); }
+	
+	
+	/**
+	 * Walk fields
+	 */
+	walk(value, errors, f)
+	{
+		let new_value = new Runtime.Map();
+		let keys = this.keys(value);
+		for (let i = 0; i < keys.count(); i++)
 		{
-			if (_ex instanceof Runtime.Exceptions.CurlException)
+			let key = keys.get(i);
+			let item_value = null;
+			if (Runtime.rtl.isImplements(value, "Runtime.SerializeInterface")) item_value = Runtime.rtl.attr(value, key);
+			else if (value instanceof Runtime.Map) item_value = value.get(key);
+			let fields = this.getRules(key);
+			let item_errors = Runtime.Vector.create([]);
+			if (fields)
 			{
-				var e = _ex;
-				res.exception(e);
-				res.ob_content = e.http_content;
-				if (Runtime.rtl.getContext().env("DEBUG"))
+				for (let j = 0; j < fields.count(); j++)
 				{
-					Runtime.io.print_error(e.http_content);
+					let item = fields.get(j);
+					if (Runtime.rtl.isImplements(item, "Runtime.Serializer.BaseType"))
+					{
+						item_value = f(item, item_value, item_errors, key);
+					}
 				}
 			}
-			else if (true)
-			{
-				var e = _ex;
-				throw e;
-			}
-			else
-			{
-				throw _ex;
-			}
+			new_value.set(key, item_value);
+			errors.appendItems(item_errors);
+			Runtime.Serializer.TypeError.addFieldErrors(item_errors, key);
 		}
-		return res;
+		return new_value;
+	}
+	
+	
+	/**
+	 * Filter type
+	 */
+	filter(value, errors, old_value, prev)
+	{
+		if (old_value == undefined) old_value = null;
+		if (prev == undefined) prev = null;
+		if (!(value instanceof Runtime.Map)) return null;
+		let new_value = this.walk(value, errors, (rule, item_value, item_errors, key) =>
+		{
+			return rule.filter(item_value, item_errors, old_value ? old_value.get(key) : null, prev);
+		});
+		return new_value;
+	}
+	
+	
+	/**
+	 * Serialize
+	 */
+	encode(value)
+	{
+		if (!(value instanceof Runtime.Map)) return null;
+		let errors = Runtime.Vector.create([]);
+		let new_value = this.walk(value, errors, (rule, item_value, item_errors) =>
+		{
+			return rule.encode(item_value);
+		});
+		return new_value;
 	}
 	
 	
@@ -6714,14 +7470,15 @@ Runtime.Web.BusHttp = class extends Runtime.BaseObject
 	_init()
 	{
 		super._init();
-		this.kind = "api";
+		this.fields = null;
+		this.items = new Runtime.Map();
 	}
-	static getClassName(){ return "Runtime.Web.BusHttp"; }
+	static getClassName(){ return "Runtime.Serializer.MapType"; }
 	static getMethodsList(){ return null; }
 	static getMethodInfoByName(field_name){ return null; }
-	static getInterfaces(){ return ["Runtime.Web.BusInterface"]; }
+	static getInterfaces(){ return ["Runtime.Serializer.BaseType"]; }
 };
-window["Runtime.Web.BusHttp"] = Runtime.Web.BusHttp;
+window["Runtime.Serializer.MapType"] = Runtime.Serializer.MapType;
 "use strict;"
 /*!
  *  BayLang Technology
@@ -6741,8 +7498,539 @@ window["Runtime.Web.BusHttp"] = Runtime.Web.BusHttp;
  *  limitations under the License.
  */
 if (typeof Runtime == 'undefined') Runtime = {};
-if (typeof Runtime.Web == 'undefined') Runtime.Web = {};
-
+if (typeof Runtime.Serializer == 'undefined') Runtime.Serializer = {};
+Runtime.Serializer.ObjectType = class extends Runtime.Serializer.MapType
+{
+	/**
+	 * Create object
+	 */
+	constructor(params)
+	{
+		if (params == undefined) params = null;
+		super();
+		this.params = params;
+		if (!params) return;
+		if (params.has("autocreate")) this.autocreate();
+		if (params.has("create")) this.fn_create = params.get("create");
+		if (params.has("class_name")) this.class_name = params.get("class_name");
+		if (params.has("class_extends")) this.class_extends = params.get("extends");
+		if (params.has("class_implements")) this.class_implements = params.get("implements");
+		if (params.has("rules")) this.fn_rules = params.get("rules");
+		if (params.has("serialize")) this.fn_serialize = params.get("serialize");
+	}
+	
+	
+	/**
+	 * Set class name
+	 */
+	setClassName(class_name)
+	{
+		this.class_name = class_name;
+	}
+	
+	
+	/**
+	 * Copy object
+	 */
+	copy()
+	{
+		let rules = new Runtime.Serializer.ObjectType();
+		rules.fn_create = this.fn_create;
+		rules.fn_rules = this.fn_rules;
+		rules.fn_serialize = this.fn_serialize;
+		rules.setup = this.setup;
+		rules.items = this.items.map((items) => { return items.slice(); });
+		rules.class_name = this.class_name;
+		rules.class_extends = this.class_extends;
+		rules.class_implements = this.class_implements;
+		return rules;
+	}
+	
+	
+	/**
+	 * Autocreate
+	 */
+	autocreate()
+	{
+		this.fn_rules = (rules, value) =>
+		{
+			rules.class_name = value.get("__class_name__");
+		};
+		this.fn_serialize = (item, value) =>
+		{
+			value.set("__class_name__", item.constructor.getClassName());
+		};
+	}
+	
+	
+	/**
+	 * Create object
+	 */
+	createObject(value, errors, prev)
+	{
+		if (this.class_name == "") return null;
+		if (!Runtime.rtl.classExists(this.class_name))
+		{
+			errors.push("Class '" + String(this.class_name) + String("' does not exists"));
+			return null;
+		}
+		if (this.class_extends != "" && !Runtime.rtl.isInstanceOf(this.class_name, this.class_extends))
+		{
+			errors.push("Class '" + String(this.class_name) + String("' does not extends '") + String(this.class_extends) + String("'"));
+			return null;
+		}
+		if (this.class_implements != "" && !Runtime.rtl.isImplements(this.class_name, this.class_implements))
+		{
+			errors.push("Class '" + String(this.class_name) + String("' does not implements '") + String(this.class_implements) + String("'"));
+			return null;
+		}
+		if (this.fn_create)
+		{
+			let fn_create = this.fn_create;
+			return fn_create(prev, this, value);
+		}
+		return Runtime.rtl.newInstance(this.class_name, Runtime.Vector.create([value]));
+	}
+	
+	
+	/**
+	 * Init rules
+	 */
+	initRules(value)
+	{
+		if (this.fn_rules)
+		{
+			let rules = this.fn_rules;
+			rules(this, value);
+		}
+		return this;
+	}
+	
+	
+	/**
+	 * Filter value
+	 */
+	filter(value, errors, old_value, prev)
+	{
+		if (old_value == undefined) old_value = null;
+		if (prev == undefined) prev = null;
+		if (value == null) return null;
+		let new_value = old_value;
+		if (!new_value)
+		{
+			let rules = this.copy().initRules(value);
+			new_value = rules.createObject(value, errors, prev);
+		}
+		if (!new_value) return null;
+		let rules = new Runtime.Serializer.ObjectType(this.params);
+		new_value.constructor.serialize(rules);
+		rules.setup.apply(Runtime.Vector.create([new_value, rules]));
+		rules.walk(value, errors, (field, new_item, item_errors, key) =>
+		{
+			if (!value.has(key)) return;
+			let old_item = new_value ? Runtime.rtl.attr(new_value, key) : null;
+			new_item = field.filter(new_item, item_errors, old_item, new_value);
+			if (key != "__class_name__")
+			{
+				Runtime.rtl.setAttr(new_value, key, new_item);
+			}
+		});
+		return new_value;
+	}
+	
+	
+	/**
+	 * Returns data
+	 */
+	encode(value)
+	{
+		if (value === null) return null;
+		if (!(Runtime.rtl.isImplements(value, "Runtime.SerializeInterface"))) return null;
+		let rules = new Runtime.Serializer.ObjectType(this.params);
+		value.constructor.serialize(rules);
+		let errors = Runtime.Vector.create([]);
+		let new_value = rules.walk(value, errors, (field, new_item, item_errors) =>
+		{
+			return field.encode(new_item);
+		});
+		let serialize = this.fn_serialize;
+		if (serialize) serialize(value, new_value);
+		return new_value;
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.fn_create = null;
+		this.fn_rules = null;
+		this.fn_serialize = null;
+		this.setup = new Runtime.Chain();
+		this.class_name = "";
+		this.class_extends = "";
+		this.class_implements = "";
+		this.params = new Runtime.Map();
+	}
+	static getClassName(){ return "Runtime.Serializer.ObjectType"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Serializer.ObjectType"] = Runtime.Serializer.ObjectType;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Serializer == 'undefined') Runtime.Serializer = {};
+Runtime.Serializer.Required = class extends Runtime.BaseObject
+{
+	/**
+	 * Filter value
+	 */
+	filter(value, errors)
+	{
+		if (value === null || value === "") errors.push(new Runtime.Serializer.TypeError("Required"));
+		return value;
+	}
+	
+	
+	/**
+	 * Returns data
+	 */
+	encode(value){ return value; }
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+	}
+	static getClassName(){ return "Runtime.Serializer.Required"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return ["Runtime.Serializer.BaseType"]; }
+};
+window["Runtime.Serializer.Required"] = Runtime.Serializer.Required;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Serializer == 'undefined') Runtime.Serializer = {};
+Runtime.Serializer.StringType = class extends Runtime.BaseObject
+{
+	/**
+	 * Constructor
+	 */
+	constructor(params)
+	{
+		if (params == undefined) params = null;
+		super();
+		if (!params) return;
+		if (params.has("convert")) this.convert = params.get("convert");
+		if (params.has("multiline")) this.multiline = params.get("multiline");
+		if (params.has("default")) this.default_value = params.get("default");
+	}
+	
+	
+	/**
+	 * Filter type
+	 */
+	filter(value, errors)
+	{
+		if (value === null)
+		{
+			if (!this.convert) errors.push(new Runtime.Serializer.TypeError("Does not string"));
+			return this.default_value;
+		}
+		if (this.convert && (Runtime.rtl.isInteger(value) || Runtime.rtl.isBoolean(value)))
+		{
+			value = Runtime.rtl.toStr(value);
+		}
+		if (!Runtime.rtl.isString(value))
+		{
+			errors.push(new Runtime.Serializer.TypeError("Does not string"));
+			return "";
+		}
+		if (this.multiline) value = Runtime.rs.replace("\r\n", "\n", value);
+		return value;
+	}
+	
+	
+	/**
+	 * Serialize data
+	 */
+	encode(value)
+	{
+		if (value === null) return "";
+		if (Runtime.rtl.isString(value)) return value;
+		if (Runtime.rtl.isBoolean(value) || Runtime.rtl.isInteger(value)) return Runtime.rtl.toStr(value);
+		return "";
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.convert = true;
+		this.multiline = true;
+		this.default_value = "";
+	}
+	static getClassName(){ return "Runtime.Serializer.StringType"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return ["Runtime.Serializer.BaseType"]; }
+};
+window["Runtime.Serializer.StringType"] = Runtime.Serializer.StringType;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Serializer == 'undefined') Runtime.Serializer = {};
+Runtime.Serializer.TypeError = class extends Runtime.BaseObject
+{
+	/**
+	 * Create type error
+	 */
+	constructor(message)
+	{
+		super();
+		this.message = message;
+	}
+	
+	
+	/**
+	 * Returns error message
+	 */
+	getMessage()
+	{
+		let path = this.path.slice().reverse();
+		let field_name = path.first();
+		if (path.count() > 1) field_name += "[" + String(Runtime.rs.join("][", path)) + String("]");
+		return field_name + String(": ") + String(this.message);
+	}
+	
+	
+	/**
+	 * Returns messages;
+	 */
+	static getMessages(errors){ return errors.map((error) => { return error.getMessage(); }); }
+	
+	
+	/**
+	 * Returns field name
+	 */
+	getFieldName(){ return Runtime.rs.join(".", this.path.slice().reverse()); }
+	
+	
+	/**
+	 * Add key to field name
+	 */
+	addKey(key)
+	{
+		this.path.push(key);
+	}
+	
+	
+	/**
+	 * Convert errors to Map
+	 */
+	static getMap(errors)
+	{
+		let result = new Runtime.Map();
+		for (let i = 0; i < errors.count(); i++)
+		{
+			let item = errors.get(i);
+			let key = item.getFieldName();
+			if (!result.has(key)) result.set(key, Runtime.Vector.create([]));
+			let arr = result.get(key);
+			arr.push(item.message);
+		}
+		return result;
+	}
+	
+	
+	/**
+	 * Add field to errors
+	 */
+	static addFieldErrors(errors, key)
+	{
+		for (let i = 0; i < errors.count(); i++)
+		{
+			let item = errors.get(i);
+			if (Runtime.rtl.isString(item))
+			{
+				item = new Runtime.Serializer.TypeError(item);
+				errors.set(i, item);
+			}
+			item.addKey(key);
+		}
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.path = Runtime.Vector.create([]);
+		this.message = "";
+	}
+	static getClassName(){ return "Runtime.Serializer.TypeError"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Serializer.TypeError"] = Runtime.Serializer.TypeError;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Serializer == 'undefined') Runtime.Serializer = {};
+Runtime.Serializer.VectorType = class extends Runtime.BaseObject
+{
+	/**
+	 * Create object
+	 */
+	constructor(fields)
+	{
+		super();
+		if (Runtime.rtl.isImplements(fields, "Runtime.Serializer.BaseType")) this.fields = Runtime.Vector.create([fields]);
+		else if (fields instanceof Runtime.Vector) this.fields = fields;
+	}
+	
+	
+	/**
+	 * Walk item
+	 */
+	walk(value, errors, f)
+	{
+		let new_value = Runtime.Vector.create([]);
+		for (let i = 0; i < value.count(); i++)
+		{
+			let item_errors = Runtime.Vector.create([]);
+			let new_item = value.get(i);
+			for (let j = 0; j < this.fields.count(); j++)
+			{
+				let field = this.fields.get(j);
+				if (Runtime.rtl.isImplements(field, "Runtime.Serializer.BaseType"))
+				{
+					new_item = f(field, new_item, item_errors, i);
+				}
+			}
+			new_value.push(new_item);
+			Runtime.Serializer.TypeError.addFieldErrors(item_errors, i);
+			errors.appendItems(item_errors);
+		}
+		return new_value;
+	}
+	
+	
+	/**
+	 * Filter value
+	 */
+	filter(value, errors, old_value, prev)
+	{
+		if (old_value == undefined) old_value = null;
+		if (prev == undefined) prev = null;
+		if (value === null) return null;
+		if (!(value instanceof Runtime.Vector)) return null;
+		let new_value = this.walk(value, errors, (field, new_item, item_errors, i) =>
+		{
+			return field.filter(new_item, item_errors, old_value ? old_value.get(i) : null, prev);
+		});
+		return new_value;
+	}
+	
+	
+	/**
+	 * Returns data
+	 */
+	encode(value)
+	{
+		if (value === null) return null;
+		if (!(value instanceof Runtime.Vector)) return null;
+		let errors = Runtime.Vector.create([]);
+		let new_value = this.walk(value, errors, (field, new_item, item_errors, i) =>
+		{
+			return field.encode(new_item);
+		});
+		return new_value;
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.fields = Runtime.Vector.create([]);
+	}
+	static getClassName(){ return "Runtime.Serializer.VectorType"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return ["Runtime.Serializer.BaseType"]; }
+};
+window["Runtime.Serializer.VectorType"] = Runtime.Serializer.VectorType;
 "use strict;"
 /*!
  *  BayLang Technology
@@ -6794,7 +8082,7 @@ Runtime.Web.RenderHelper = class
 		r = this.hexdec(r);
 		g = this.hexdec(g);
 		b = this.hexdec(b);
-		return new Runtime.Vector(r, g, b);
+		return Runtime.Vector.create([r, g, b]);
 	}
 	
 	
@@ -6914,24 +8202,37 @@ Runtime.Web.Request = class extends Runtime.BaseObject
 	/**
 	 * Serialize object
 	 */
-	serialize(serializer, data)
+	static serialize(rules)
 	{
-		serializer.process(this, "uri", data);
-		serializer.process(this, "full_uri", data);
-		serializer.process(this, "host", data);
-		serializer.process(this, "method", data);
-		serializer.process(this, "protocol", data);
-		serializer.process(this, "is_https", data);
-		serializer.process(this, "query", data);
+		super.serialize(rules);
+		rules.addType("uri", new Runtime.Serializer.StringType());
+		rules.addType("full_uri", new Runtime.Serializer.StringType());
+		rules.addType("host", new Runtime.Serializer.StringType());
+		rules.addType("method", new Runtime.Serializer.StringType());
+		rules.addType("protocol", new Runtime.Serializer.StringType());
+		rules.addType("is_https", new Runtime.Serializer.StringType());
+		rules.addType("query", new Runtime.Serializer.MapType(new Runtime.Serializer.StringType()));
+	}
+	
+	
+	/**
+	 * Assign rules
+	 */
+	assignRules(rules)
+	{
 	}
 	
 	
 	/**
 	 * Returns client ip
 	 */
-	getClientIp()
+	getClientIP()
 	{
-		return this.headers.get("REMOTE_ADDR");
+		let params = Runtime.rtl.getContext().hook(Runtime.Web.Hooks.AppHook.CLIENT_IP, Runtime.Map.create({
+			"headers": this.headers,
+			"client_ip": this.headers.get("REMOTE_ADDR"),
+		}));
+		return params.get("client_ip");
 	}
 	
 	
@@ -7011,22 +8312,22 @@ Runtime.Web.RouteInfo = class extends Runtime.BaseObject
 	
 	
 	/**
-	 * Process frontend data
+	 * Serialize object
 	 */
-	serialize(serializer, data)
+	static serialize(rules)
 	{
-		serializer.process(this, "data", data);
-		serializer.process(this, "domain", data);
-		serializer.process(this, "label", data);
-		serializer.process(this, "layout", data);
-		serializer.process(this, "matches", data);
-		serializer.process(this, "middleware", data);
-		serializer.process(this, "name", data);
-		serializer.process(this, "params", data);
-		serializer.process(this, "pos", data);
-		serializer.process(this, "route_class", data);
-		serializer.process(this, "uri", data);
-		serializer.process(this, "uri_match", data);
+		super.serialize(rules);
+		rules.addType("data", new Runtime.Serializer.MapType(new Runtime.Serializer.StringType()));
+		rules.addType("domain", new Runtime.Serializer.StringType());
+		rules.addType("label", new Runtime.Serializer.StringType());
+		rules.addType("layout", new Runtime.Serializer.StringType());
+		rules.addType("name", new Runtime.Serializer.StringType());
+		rules.addType("matches", new Runtime.Serializer.MapType(new Runtime.Serializer.StringType()));
+		rules.addType("params", new Runtime.Serializer.VectorType(new Runtime.Serializer.StringType()));
+		rules.addType("pos", new Runtime.Serializer.IntegerType());
+		rules.addType("route_class", new Runtime.Serializer.StringType());
+		rules.addType("uri", new Runtime.Serializer.StringType());
+		rules.addType("uri_match", new Runtime.Serializer.StringType());
 	}
 	
 	
@@ -7035,7 +8336,7 @@ Runtime.Web.RouteInfo = class extends Runtime.BaseObject
 	 */
 	copy()
 	{
-		return Runtime.Serializer.copy(this);
+		return Runtime.rtl.copy(this);
 	}
 	
 	
@@ -7077,7 +8378,7 @@ Runtime.Web.RouteInfo = class extends Runtime.BaseObject
 		}
 		else
 		{
-			this.params = new Runtime.Vector();
+			this.params = Runtime.Vector.create([]);
 		}
 	}
 	
@@ -7164,7 +8465,7 @@ Runtime.Web.RouteInfo = class extends Runtime.BaseObject
 		this.route_class = null;
 		this.data = null;
 		this.middleware = null;
-		this.params = new Runtime.Vector();
+		this.params = Runtime.Vector.create([]);
 		this.matches = new Runtime.Map();
 		this.is_backend = false;
 		this.pos = 100;
@@ -7200,10 +8501,19 @@ Runtime.Web.RouteList = class extends Runtime.BaseObject
 	/**
 	 * Serialize
 	 */
-	serialize(serializer, data)
+	static serialize(rules)
 	{
-		serializer.process(this, "routes", data);
-		serializer.process(this, "route_params", data);
+		super.serialize(rules);
+		rules.addType("routes", new Runtime.Serializer.MapType(new Runtime.Serializer.MapType(new Runtime.Serializer.StringType())));
+		rules.addType("route_params", new Runtime.Serializer.MapType(new Runtime.Serializer.StringType()));
+	}
+	
+	
+	/**
+	 * Assign rules
+	 */
+	assignRules(rule)
+	{
 	}
 	
 	
@@ -7300,10 +8610,9 @@ Runtime.Web.RouteAction = class extends Runtime.Web.RouteInfo
 	/**
 	 * Process frontend data
 	 */
-	serialize(serializer, data)
+	static serialize(rules)
 	{
-		serializer.process(this, "action", data);
-		super.serialize(serializer, data);
+		super.serialize(rules);
 	}
 	
 	
@@ -7349,9 +8658,9 @@ Runtime.Web.RouteAction = class extends Runtime.Web.RouteInfo
 			action = new Runtime.Method(base_route, base_route.action);
 		}
 		/* Apply action */
-		if (action.exists())
+		if (action && action.exists())
 		{
-			await action.apply(new Runtime.Vector(container));
+			await action.apply(Runtime.Vector.create([container]));
 		}
 	}
 	
@@ -7393,10 +8702,10 @@ Runtime.Web.RoutePage = class extends Runtime.Web.RouteInfo
 	/**
 	 * Process frontend data
 	 */
-	serialize(serializer, data)
+	static serialize(rules)
 	{
-		serializer.process(this, "page", data);
-		super.serialize(serializer, data);
+		super.serialize(rules);
+		rules.addType("page", new Runtime.Serializer.StringType());
 	}
 	
 	
@@ -7406,10 +8715,9 @@ Runtime.Web.RoutePage = class extends Runtime.Web.RouteInfo
 	async render(container)
 	{
 		container.layout.current_page_model = "page_model";
-		let page_model = container.layout.addWidget("Runtime.BaseModel", Runtime.Map.create({
-			"widget_name": "page_model",
+		container.layout.pages.set("page_model", container.layout.createWidget("Runtime.BaseModel", Runtime.Map.create({
 			"component": this.page,
-		}));
+		})));
 		if (this.data)
 		{
 			let title = this.data.get("title");
@@ -7456,11 +8764,11 @@ Runtime.Web.RouteModel = class extends Runtime.Web.RouteInfo
 	/**
 	 * Process frontend data
 	 */
-	serialize(serializer, data)
+	static serialize(rules)
 	{
-		serializer.process(this, "model", data);
-		serializer.process(this, "model_params", data);
-		super.serialize(serializer, data);
+		super.serialize(rules);
+		rules.addType("model", new Runtime.Serializer.StringType());
+		rules.addType("model_params", new Runtime.Serializer.MapType());
 	}
 	
 	
@@ -7481,7 +8789,7 @@ Runtime.Web.RouteModel = class extends Runtime.Web.RouteInfo
 	_init()
 	{
 		super._init();
-		this.model = null;
+		this.model = "";
 		this.model_params = null;
 	}
 	static getClassName(){ return "Runtime.Web.RouteModel"; }
@@ -7586,7 +8894,7 @@ Runtime.Web.RouteProvider = class extends Runtime.BaseProvider
 	 */
 	sortRoutes()
 	{
-		let routes_list = this.routes_list.map((value, index) => { return new Runtime.Vector(value, index); });
+		let routes_list = this.routes_list.map((value, index) => { return Runtime.Vector.create([value, index]); });
 		routes_list.sort((a, b) =>
 		{
 			let pos_a = a.get(0).pos;
@@ -7631,6 +8939,15 @@ Runtime.Web.RouteProvider = class extends Runtime.BaseProvider
 		let router = layout.storage.createWidget("Runtime.Web.RouteList");
 		router.routes = this.routes.copy();
 		layout.storage.set("router", router);
+	}
+	
+	
+	/**
+	 * Returns route by name
+	 */
+	getRoute(route_name)
+	{
+		return this.routes_list.find((route) => { return route.name == route_name; });
 	}
 	
 	
@@ -7684,7 +9001,7 @@ Runtime.Web.RouteProvider = class extends Runtime.BaseProvider
 	{
 		super._init();
 		this.routes = new Runtime.Map();
-		this.routes_list = new Runtime.Vector();
+		this.routes_list = Runtime.Vector.create([]);
 	}
 	static getClassName(){ return "Runtime.Web.RouteProvider"; }
 	static getMethodsList(){ return null; }
@@ -7717,6 +9034,7 @@ Runtime.Web.Hooks.AppHook = class extends Runtime.Hooks.BaseHook
 {
 	static ASSETS = "runtime.web.app::assets";
 	static CALL_API_BEFORE = "runtime.web.app::call_api_before";
+	static CLIENT_IP = "runtime.web.app::client_ip";
 	static FIND_API = "runtime.web.app::find_api";
 	static FIND_ROUTE_BEFORE = "runtime.web.app::find_route_before";
 	static FIND_ROUTE_AFTER = "runtime.web.app::find_route_after";
@@ -7737,14 +9055,14 @@ Runtime.Web.Hooks.AppHook = class extends Runtime.Hooks.BaseHook
 	{
 		super.register_hooks();
 		/* Async hooks */
-		this.provider.setAsync(new Runtime.Vector(
+		this.provider.setAsync(Runtime.Vector.create([
 			this.constructor.FIND_ROUTE_AFTER,
 			this.constructor.FIND_ROUTE_BEFORE,
 			this.constructor.ROUTES_INIT,
 			this.constructor.ROUTE_AFTER,
 			this.constructor.ROUTE_MIDDLEWARE,
 			this.constructor.ROUTE_BEFORE,
-		));
+		]));
 		/* Hooks */
 	}
 	
@@ -7797,7 +9115,7 @@ Runtime.Web.Hooks.AssetsHook = class extends Runtime.Web.Hooks.AppHook
 	 */
 	assets(params)
 	{
-		let path = Runtime.rs.join_path(new Runtime.Vector(Runtime.rtl.getContext().env("ROUTE_PREFIX"), "assets"));
+		let path = Runtime.rs.join_path(Runtime.Vector.create([Runtime.rtl.getContext().env("ROUTE_PREFIX"), "assets"]));
 		params.set("assets_path", path);
 	}
 	
@@ -8002,9 +9320,9 @@ Runtime.Web.Hooks.Components = class extends Runtime.Hooks.RuntimeHook
 	{
 		super._init();
 		this.items = Runtime.Map.create({
-			"components": new Runtime.Vector(),
-			"footer": new Runtime.Vector(),
-			"header": new Runtime.Vector(),
+			"components": Runtime.Vector.create([]),
+			"footer": Runtime.Vector.create([]),
+			"header": Runtime.Vector.create([]),
 		});
 	}
 	static getClassName(){ return "Runtime.Web.Hooks.Components"; }
@@ -8045,9 +9363,10 @@ Runtime.Web.Hooks.DetectLanguage = class extends Runtime.Hooks.RuntimeHook
 	/**
 	 * Init params
 	 */
-	initParam(params)
+	initParams(params)
 	{
-		super.initParam(params);
+		super.initParams(params);
+		if (!params) return;
 		if (params.has("allowed_languages"))
 		{
 			this.allowed_languages = params.get("allowed_languages");
@@ -8075,9 +9394,9 @@ Runtime.Web.Hooks.DetectLanguage = class extends Runtime.Hooks.RuntimeHook
 	_init()
 	{
 		super._init();
-		this.default_language = "";
+		this.default_language = "en";
 		this.route_match_name = "lang";
-		this.allowed_languages = new Runtime.Vector();
+		this.allowed_languages = Runtime.Vector.create([]);
 	}
 	static getClassName(){ return "Runtime.Web.Hooks.DetectLanguage"; }
 	static getMethodsList(){ return null; }
@@ -8392,9 +9711,9 @@ Runtime.Web.ModuleDescription = class
 	 */
 	static entities()
 	{
-		return new Runtime.Vector(
+		return Runtime.Vector.create([
 			new Runtime.Entity.Provider("Runtime.Web.RouteProvider"),
-		);
+		]);
 	}
 	
 	
@@ -8444,9 +9763,9 @@ Runtime.Widget.AppHook = class extends Runtime.Hooks.RuntimeHook
 	 */
 	components(params)
 	{
-		let components = new Runtime.Vector(
+		let components = Runtime.Vector.create([
 			"Runtime.Widget.CSS",
-		);
+		]);
 		components.appendItems(params.get("components"));
 		params.set("components", components);
 	}
@@ -8491,7 +9810,7 @@ Runtime.Widget.Button = {
 		target: {default: "_self"},
 		content: {default: ""},
 		href: {default: null},
-		styles: {default: new Runtime.Vector()},
+		styles: {default: Runtime.Vector.create([])},
 	},
 	methods:
 	{
@@ -8525,7 +9844,7 @@ Runtime.Widget.Button = {
 		},
 		getClassName: function(){ return "Runtime.Widget.Button"; },
 	},
-	getComponentStyle: function(){ return ".button{display: inline-flex;align-items: center;justify-content: center;color: var(--color-text);font-weight: 500;font-family: var(--font-family);font-size: var(--font-input-size);line-height: var(--line-height);text-decoration: none;background-color: var(--color-surface);border: var(--border-width) var(--color-border) solid;padding: calc(var(--space) * 0.75) calc(var(--space) * 1.5);outline: none;cursor: pointer;border-radius: var(--border-radius);transition: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.button:hover{box-shadow: 0 0 0 calc(var(--space) * 0.25) rgba(var(--color-primary-dark), 0.25)}.button:active{box-shadow: inset 0px 2px 5px 0px rgba(0,0,0,0.25)}.button--small{padding: calc(var(--space) * 0.5) calc(var(--space) * 1);line-height: 1.2em}.button--large{padding: calc(var(--space) * 1) calc(var(--space) * 2)}.button--primary{color: var(--color-primary-text);background-color: var(--color-primary);border-color: var(--color-primary-border)}.button--primary:hover{background-color: var(--color-primary-hover);border-color: var(--color-primary-hover)}.button--secondary{color: var(--color-secondary-text);background-color: var(--color-secondary);border-color: var(--color-secondary-border)}.button--secondary:hover{background-color: var(--color-secondary-hover);border-color: var(--color-secondary-hover)}.button--outline{background-color: transparent;color: var(--color-text);border-color: var(--color-border)}.button--outline:hover{background-color: var(--color-surface)}.button--danger{color: var(--color-danger-text);background-color: var(--color-danger);border-color: var(--color-danger-border)}.button--danger:hover{background-color: var(--color-danger-hover)}.button--success{color: var(--color-success-text);background-color: var(--color-success);border-color: var(--color-success-border)}.button--success:hover{background-color: var(--color-success-hover)}.button--info{color: var(--color-info-text);background-color: var(--color-info);border-color: var(--color-info-border)}.button--info:hover{background-color: var(--color-info-hover)}.button--warning{background-color: var(--color-warning);border-color: var(--color-warning-border)}.button--warning:hover{background-color: var(--color-warning-hover)}.button--stretch{width: 100%}"; },
+	getComponentStyle: function(){ return ".button{display: inline-flex;align-items: center;justify-content: center;color: var(--color-text);font-weight: 500;font-family: var(--font-family);font-size: var(--font-input-size);line-height: var(--line-height);text-decoration: none;background-color: var(--color-background);border: var(--border-width) var(--color-border) solid;padding: calc(var(--space) * 0.75) calc(var(--space) * 1.5);outline: none;cursor: pointer;border-radius: var(--border-radius);transition: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.button:active{box-shadow: inset 0px 2px 5px 0px rgba(0,0,0,0.25);outline: none}.button--small{padding: calc(var(--space) * 0.5) calc(var(--space) * 1);line-height: 1.2em}.button--large{padding: calc(var(--space) * 1) calc(var(--space) * 2)}.button--primary{color: var(--color-primary-text);background-color: var(--color-primary);border-color: var(--color-primary-border)}.button--primary:hover{background-color: var(--color-primary-hover)}.button--secondary{color: var(--color-secondary-text);background-color: var(--color-secondary);border-color: var(--color-secondary-border)}.button--secondary:hover{background-color: var(--color-secondary-hover)}.button--outline{background-color: transparent;color: var(--color-text);border-color: var(--color-border)}.button--outline:hover{background-color: var(--color-surface)}.button--danger{color: var(--color-danger-text);background-color: var(--color-danger);border-color: var(--color-danger-border)}.button--danger:hover{background-color: var(--color-danger-hover)}.button--success{color: var(--color-success-text);background-color: var(--color-success);border-color: var(--color-success-border)}.button--success:hover{background-color: var(--color-success-hover)}.button--info{color: var(--color-info-text);background-color: var(--color-info);border-color: var(--color-info-border)}.button--info:hover{background-color: var(--color-info-hover)}.button--warning{background-color: var(--color-warning);border-color: var(--color-warning-border)}.button--warning:hover{background-color: var(--color-warning-hover)}.button--stretch{width: 100%}"; },
 	getRequiredComponents: function(){ return new Runtime.Vector(); },
 };
 window["Runtime.Widget.Button"] = Runtime.Widget.Button;
@@ -8556,7 +9875,7 @@ Runtime.Widget.CSS = {
 	{
 		getClassName: function(){ return "Runtime.Widget.CSS"; },
 	},
-	getComponentStyle: function(){ return ":root{--font-family: 'Arial', sans-serif;--font-size: 16px;--font-size-h1: 2.2rem;--font-size-h2: 1.8rem;--font-size-h3: 1.5rem;--font-size-h4: 1.2rem;--font-size-h5: 1rem;--font-size-h6: 1rem;--font-input-size: 16px;--line-height: 1.6;--space: 0.5rem;--color-background: #ffffff;--color-surface: #f8f9fa;--color-border: #e0e1e6;--color-shadow: rgba(0, 0, 0, 0.1);--color-primary: #337ab7;--color-primary-border: #337ab7;--color-primary-hover: #2563eb;--color-primary-text: #ffffff;--color-secondary: #6c757d;--color-secondary-border: #6c757d;--color-secondary-hover: #545b62;--color-secondary-text: #ffffff;--color-success: #198754;--color-success-border: #198754;--color-success-hover: #1e7e34;--color-success-text: #ffffff;--color-danger: #dc3545;--color-danger-danger: #dc3545;--color-danger-hover: #c82333;--color-danger-text: #ffffff;--color-warning: #fbbf24;--color-warning-border: #fbbf24;--color-warning-hover: #e0a800;--color-warinng-text: #212529;--color-info: #60a5fa;--color-info-border: #60a5fa;--color-info-hover: #117a8b;--color-info-text: #ffffff;--color-text: #212529;--color-text-secondary: #6c757d;--color-heading-text: #343a40;--color-link: var(--color-primary);--color-link-hover: var(--color-primary-dark);--color-default-hover: rgba(0, 0, 0, 0.05);--color-selected: var(--color-primary);--color-selected-text: #ffffff;--border-radius: 6px;--border-radius-large: 12px;--border-width: 1px;--shadow-small: 0 1px 2px 0 rgba(0, 0, 0, 0.05);--shadow-medium: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);--shadow-large: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);--transition: 0.3s;--transition-type: ease-in-out;--content-max-width: 1280px;--content-tablet-width: 1024px;--content-mobile-width: 768px;--padding-desktop: 2rem;--padding-tablet: 1.5rem;--padding-mobile: 1rem}.theme_dark{--color-background: #1a202c;--color-surface: #2d3748;--color-border: #4a5568;--color-shadow: rgba(0, 0, 0, 0.3);--color-primary: #63b3ed;--color-primary-light: #90cdf4;--color-primary-dark: #4299e1;--color-primary-text: #ffffff;--color-secondary: #a0aec0;--color-secondary-light: #1a202c;--color-secondary-dark: #cbd5e0;--color-secondary-text: #718096;--color-success: #68d391;--color-success-light: #5cb870;--color-success-dark: #1e7e34;--color-success-text: #ffffff;--color-danger: #fc8181;--color-danger-light: #e4606d;--color-danger-dark: #c82333;--color-danger-text: #ffffff;--color-warning: #f6e05e;--color-warning-light: #ffcd38;--color-warning-dark: #e0a800;--color-warinng-text: #212529;--color-info: #63b3ed;--color-info-light: #4bd2e3;--color-info-dark: #117a8b;--color-info-text: #ffffff;--color-text: #e2e8f0;--color-text-secondary: #a0aec0;--color-heading-text: #ffffff;--color-link: var(--color-primary);--color-link-hover: var(--color-primary-light)}body, html{scroll-behavior: smooth;transition: background-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.root_container{font-family: var(--font-family);font-size: var(--font-size);line-height: var(--line-height);box-sizing: border-box;width: 100%;padding: 0;margin: 0}.root_container *{box-sizing: border-box}.root_container h1, .root_container h2, .root_container h3, .root_container h4, .root_container h5, .root_container h6{font-family: var(--font-family);color: var(--color-heading-text);margin-top: calc(var(--space) * 3);margin-bottom: var(--space);line-height: 1.2;transition: background-color var(--transition) ease,\n\t\tcolor var(--transition) ease}.root_container h1{font-size: var(--font-size-h1);margin-top: 0}.root_container h2{font-size: var(--font-size-h2)}.root_container h3{font-size: var(--font-size-h3)}.root_container h4{font-size: var(--font-size-h4)}.root_container h5{font-size: var(--font-size-h5)}.root_container h6{font-size: var(--font-size-h6)}.root_container p{margin-bottom: 1em;transition: background-color var(--transition) ease,\n\t\tcolor var(--transition) ease}.link{text-decoration: none;color: var(--color-link);cursor: pointer}.link:hover, .link:visited:hover{text-decoration: underline;color: red}.link:visited{text-decoration: none;color: var(--color-link)}.nolink{text-decoration: inherit;color: inherit}.nolink:hover, .nolink:visited, .nolink:visited:hover{text-decoration: inherit;color: inherit}.cursor{cursor: pointer}.nowrap{white-space: nowrap}.bold{font-weight: bold}.nobold{font-weight: normal}.underline{text-decoration: underline}.center{text-align: center}.left{text-align: left}.right{text-align: right}.clear{clear: both}.hidden{display: none}.inline-block{display: inline-block}.scroll-lock{overflow: hidden}.scroll-lock .core_ui_root{padding-right: 15px}"; },
+	getComponentStyle: function(){ return ":root{--font-family: 'Arial', sans-serif;--font-size: 16px;--font-size-h1: 2.2rem;--font-size-h2: 1.8rem;--font-size-h3: 1.5rem;--font-size-h4: 1.2rem;--font-size-h5: 1rem;--font-size-h6: 1rem;--font-input-size: 16px;--line-height: 1.6;--space: 0.5rem;--color-background: #ffffff;--color-surface: #f8f9fa;--color-border: #e0e1e6;--color-shadow: rgba(0, 0, 0, 0.1);--color-primary: #337ab7;--color-primary-border: #337ab7;--color-primary-hover: #2563eb;--color-primary-text: #ffffff;--color-secondary: #6c757d;--color-secondary-border: #6c757d;--color-secondary-hover: #545b62;--color-secondary-text: #ffffff;--color-success: #198754;--color-success-border: #198754;--color-success-hover: #1e7e34;--color-success-text: #ffffff;--color-danger: #dc3545;--color-danger-danger: #dc3545;--color-danger-hover: #c82333;--color-danger-text: #ffffff;--color-warning: #fbbf24;--color-warning-border: #fbbf24;--color-warning-hover: #e0a800;--color-warinng-text: #212529;--color-info: #60a5fa;--color-info-border: #60a5fa;--color-info-hover: #117a8b;--color-info-text: #ffffff;--color-text: #212529;--color-text-secondary: #6c757d;--color-heading-text: #343a40;--color-link: var(--color-primary);--color-link-hover: var(--color-primary-dark);--color-hover: rgba(0, 0, 0, 0.05);--color-selected: var(--color-primary);--color-selected-text: #ffffff;--border-radius: 6px;--border-radius-large: 12px;--border-width: 1px;--shadow-small: 0 1px 2px 0 rgba(0, 0, 0, 0.05);--shadow-medium: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);--shadow-large: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);--transition: 0.3s;--transition-type: ease-in-out;--transition-background: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type);--content-max-width: 1280px;--content-tablet-width: 1024px;--content-mobile-width: 768px;--padding-desktop: 2rem;--padding-tablet: 1.5rem;--padding-mobile: 1rem}.theme_dark{--color-background: #1a202c;--color-surface: #2d3748;--color-border: #4a5568;--color-shadow: rgba(0, 0, 0, 0.3);--color-primary: #63b3ed;--color-primary-light: #90cdf4;--color-primary-dark: #4299e1;--color-primary-text: #ffffff;--color-secondary: #a0aec0;--color-secondary-light: #1a202c;--color-secondary-dark: #cbd5e0;--color-secondary-text: #718096;--color-success: #68d391;--color-success-light: #5cb870;--color-success-dark: #1e7e34;--color-success-text: #ffffff;--color-danger: #fc8181;--color-danger-light: #e4606d;--color-danger-dark: #c82333;--color-danger-text: #ffffff;--color-warning: #f6e05e;--color-warning-light: #ffcd38;--color-warning-dark: #e0a800;--color-warinng-text: #212529;--color-info: #63b3ed;--color-info-light: #4bd2e3;--color-info-dark: #117a8b;--color-info-text: #ffffff;--color-text: #e2e8f0;--color-text-secondary: #a0aec0;--color-heading-text: #ffffff;--color-link: var(--color-primary);--color-link-hover: var(--color-primary-light)}body, html{scroll-behavior: smooth;transition: background-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.root_container{font-family: var(--font-family);font-size: var(--font-size);line-height: var(--line-height);box-sizing: border-box;width: 100%;padding: 0;margin: 0}.root_container *{box-sizing: border-box}.root_container h1, .root_container h2, .root_container h3, .root_container h4, .root_container h5, .root_container h6{font-family: var(--font-family);color: var(--color-heading-text);margin-top: calc(var(--space) * 3);margin-bottom: var(--space);line-height: 1.2;transition: background-color var(--transition) ease,\n\t\tcolor var(--transition) ease}.root_container h1{font-size: var(--font-size-h1);margin-top: 0}.root_container h2{font-size: var(--font-size-h2)}.root_container h3{font-size: var(--font-size-h3)}.root_container h4{font-size: var(--font-size-h4)}.root_container h5{font-size: var(--font-size-h5)}.root_container h6{font-size: var(--font-size-h6)}.root_container p{margin-bottom: 1em;transition: background-color var(--transition) ease,\n\t\tcolor var(--transition) ease}.link{text-decoration: none;color: var(--color-link);cursor: pointer}.link:hover, .link:visited:hover{text-decoration: underline;color: red}.link:visited{text-decoration: none;color: var(--color-link)}.nolink{text-decoration: inherit;color: inherit}.nolink:hover, .nolink:visited, .nolink:visited:hover{text-decoration: inherit;color: inherit}.cursor{cursor: pointer}.nowrap{white-space: nowrap}.bold{font-weight: bold}.nobold{font-weight: normal}.underline{text-decoration: underline}.center{text-align: center}.left{text-align: left}.right{text-align: right}.clear{clear: both}.hidden{display: none}.inline-block{display: inline-block}.scroll-lock{overflow: hidden}.scroll-lock .core_ui_root{padding-right: 15px}"; },
 	getRequiredComponents: function(){ return new Runtime.Vector(); },
 };
 window["Runtime.Widget.CSS"] = Runtime.Widget.CSS;
@@ -8779,7 +10098,7 @@ Runtime.Widget.Input = {
 		},
 		getClassName: function(){ return "Runtime.Widget.Input"; },
 	},
-	getComponentStyle: function(){ return ".input.h-f2de{width: 100%;font-family: var(--font-family);font-size: var(--font-input-size);padding: calc(var(--space) * 0.75) calc(var(--space) * 1.5);background-color: var(--color-default);border-width: var(--border-width);border-color: var(--color-border);border-style: solid;border-radius: var(--border-radius);box-shadow: none;color: var(--text-color);outline: transparent;line-height: normal;min-height: 32px;transition: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.input.h-f2de:focus{outline: transparent}"; },
+	getComponentStyle: function(){ return ".input.h-f2de{width: 100%;font-family: var(--font-family);font-size: var(--font-input-size);padding: calc(var(--space) * 0.75) calc(var(--space) * 1.5);background-color: var(--color-background);border-width: var(--border-width);border-color: var(--color-border);border-style: solid;border-radius: var(--border-radius);box-shadow: none;color: var(--text-color);outline: transparent;line-height: normal;min-height: 32px;transition: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.input.h-f2de:focus{outline: transparent}"; },
 	getRequiredComponents: function(){ return new Runtime.Vector(); },
 };
 window["Runtime.Widget.Input"] = Runtime.Widget.Input;
@@ -8922,7 +10241,7 @@ Runtime.Widget.Menu = {
 	name: "Runtime.Widget.Menu",
 	extends: Runtime.Component,
 	props: {
-		items: {default: new Runtime.Vector()},
+		items: {default: Runtime.Vector.create([])},
 	},
 	methods:
 	{
@@ -9001,8 +10320,8 @@ Runtime.Widget.Pagination = {
 			const componentHash = rs.getComponentHash(this.getClassName());
 			let __v = new Runtime.VirtualDom(this);
 			
-			let page_start = Runtime.Math.max(2, this.page - this.delta + 1);
-			let page_end = Runtime.Math.min(this.page + this.delta, this.pages - 1);
+			let page_start = Runtime.rtl.max(2, this.page - this.delta + 1);
+			let page_end = Runtime.rtl.min(this.page + this.delta, this.pages - 1);
 			let props = new Runtime.Map();
 			
 			/* Element nav */
@@ -9138,7 +10457,7 @@ Runtime.Widget.Result = {
 			let __v = new Runtime.VirtualDom(this);
 			
 			/* Element div */
-			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["result", this.getErrorClass(), Runtime.rs.mergeStyles("result", this.styles), componentHash])}));
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["result", this.class, this.getErrorClass(), componentHash])}));
 			__v0.push(this.model.message);
 			
 			return __v;
@@ -9155,7 +10474,7 @@ Runtime.Widget.Result = {
 		},
 		getClassName: function(){ return "Runtime.Widget.Result"; },
 	},
-	getComponentStyle: function(){ return ".result.h-4c3d{text-align: center}.result--margin_top.h-4c3d{margin-top: var(--space)}.result--success.h-4c3d{color: var(--color-success)}.result--error.h-4c3d{color: var(--color-danger)}.result--hide.h-4c3d{display: none}"; },
+	getComponentStyle: function(){ return ".result--center.h-4c3d{text-align: center}.result--margin_top.h-4c3d, .result--margin_bottom.h-4c3d{margin-top: calc(var(--space) * 2)}.result--field.h-4c3d{margin-top: calc(var(--space) * 0.5)}.result--form.h-4c3d{text-align: center;margin-top: calc(var(--space) * 2);margin-bottom: calc(var(--space) * 2)}.result--form.h-4c3d:last-child{margin-bottom: 0}.result--success.h-4c3d{color: var(--color-success)}.result--error.h-4c3d{color: var(--color-danger)}.result--hide.h-4c3d{display: none}"; },
 	getRequiredComponents: function(){ return new Runtime.Vector(); },
 };
 window["Runtime.Widget.Result"] = Runtime.Widget.Result;
@@ -9181,6 +10500,17 @@ if (typeof Runtime == 'undefined') Runtime = {};
 if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
 Runtime.Widget.ResultModel = class extends Runtime.BaseModel
 {
+	/**
+	 * Serialize object
+	 */
+	static serialize(rules)
+	{
+		super.serialize(rules);
+		rules.addType("code", new Runtime.Serializer.IntegerType());
+		rules.addType("message", new Runtime.Serializer.StringType());
+	}
+	
+	
 	/**
 	 * Init widget params
 	 */
@@ -9274,17 +10604,6 @@ Runtime.Widget.ResultModel = class extends Runtime.BaseModel
 	isSuccess(){ return this.code > 0; }
 	
 	
-	/**
-	 * Process frontend data
-	 */
-	serialize(serializer, data)
-	{
-		serializer.process(this, "code", data);
-		serializer.process(this, "message", data);
-		super.serialize(serializer, data);
-	}
-	
-	
 	/* ========= Class init functions ========= */
 	_init()
 	{
@@ -9299,6 +10618,49 @@ Runtime.Widget.ResultModel = class extends Runtime.BaseModel
 	static getInterfaces(){ return []; }
 };
 window["Runtime.Widget.ResultModel"] = Runtime.Widget.ResultModel;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+Runtime.Widget.RowButtons = {
+	name: "Runtime.Widget.RowButtons",
+	extends: Runtime.Component,
+	methods:
+	{
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["row_buttons", this.class, componentHash])}));
+			__v0.push(this.renderSlot("default"));
+			
+			return __v;
+		},
+		getClassName: function(){ return "Runtime.Widget.RowButtons"; },
+	},
+	getComponentStyle: function(){ return ".row_buttons.h-a597{display: flex;gap: calc(var(--space) * 0.5)}.row_buttons.margin_top.h-a597{margin-top: calc(var(--space) * 2)}.row_buttons.margin_bottom.h-a597{margin-bottom: calc(var(--space) * 2)}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector(); },
+};
+window["Runtime.Widget.RowButtons"] = Runtime.Widget.RowButtons;
 "use strict;"
 /*
  *  BayLang Technology
@@ -9406,7 +10768,7 @@ Runtime.Widget.Section = {
 		 */
 		getStyle: function()
 		{
-			let res = new Runtime.Vector();
+			let res = Runtime.Vector.create([]);
 			if (!this.wrap)
 			{
 				res.push(this.getWrapStyle());
@@ -9418,7 +10780,7 @@ Runtime.Widget.Section = {
 		 */
 		getWrapStyle: function()
 		{
-			let res = new Runtime.Vector();
+			let res = Runtime.Vector.create([]);
 			if (this.flex == "true")
 			{
 				res.push("display: flex;");
@@ -9563,606 +10925,6 @@ window["Runtime.Widget.Select"] = Runtime.Widget.Select;
 /*
  *  BayLang Technology
  *
- *  (c) Copyright 2016-2024 "Ildar Bikmamatov" <support@bayrell.org>
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
-*/
-if (typeof Runtime == 'undefined') Runtime = {};
-if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
-Runtime.Widget.SelectLabel = {
-	name: "Runtime.Widget.SelectLabel",
-	extends: Runtime.Component,
-	props: {
-		value: {default: ""},
-		options: {default: new Runtime.Vector()},
-	},
-	methods:
-	{
-		render: function()
-		{
-			const rs = use("Runtime.rs");
-			const componentHash = rs.getComponentHash(this.getClassName());
-			let __v = new Runtime.VirtualDom(this);
-			
-			/* Element span */
-			let __v0 = __v.element("span", new Runtime.Map({"class": rs.className(["widget_select_label", componentHash])}));
-			
-			var item = this.options ? this.options.findItem((item) => { return item.get("key") == this.value; }) : null;
-			__v0.push(item != null ? item.get("value") : this.value);
-			
-			return __v;
-		},
-		getClassName: function(){ return "Runtime.Widget.SelectLabel"; },
-	},
-	getComponentStyle: function(){ return ""; },
-	getRequiredComponents: function(){ return new Runtime.Vector(); },
-};
-window["Runtime.Widget.SelectLabel"] = Runtime.Widget.SelectLabel;
-"use strict;"
-/*
- *  BayLang Technology
- *
- *  (c) Copyright 2016-2024 "Ildar Bikmamatov" <support@bayrell.org>
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
-*/
-if (typeof Runtime == 'undefined') Runtime = {};
-if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
-Runtime.Widget.SortableList = {
-	name: "Runtime.Widget.SortableList",
-	extends: Runtime.Component,
-	props: {
-		show_buttons: {default: "true"},
-		name: {default: ""},
-		value: {default: new Runtime.Vector()},
-	},
-	data: function()
-	{
-		return {
-			old_value: new Runtime.Vector(),
-			is_drag: false,
-			is_transition: false,
-			drag_elem: null,
-			drag_item: null,
-			drag_item_pos: -1,
-			shadow_elem: null,
-			drag_elem_css: null,
-			drag_start_point: null,
-			duration: 300,
-		};
-	},
-	methods:
-	{
-		renderValue: function(pos, item)
-		{
-			const rs = use("Runtime.rs");
-			const componentHash = rs.getComponentHash(this.getClassName());
-			let __v = new Runtime.VirtualDom(this);
-			
-			/* Element Runtime.Widget.Input */
-			__v.element(Runtime.Widget.Input, new Runtime.Map({"value": item, "key": item, "onValueChange": this.hash(0) ? this.hash(0) : this.hash(0, (message) =>
-			{
-				var items = this.getItems();
-				items.set(pos, message.value);
-				this.onValueChange();
-			})}));
-			
-			return __v;
-		},
-		renderItem: function(pos)
-		{
-			const rs = use("Runtime.rs");
-			const componentHash = rs.getComponentHash(this.getClassName());
-			let __v = new Runtime.VirtualDom(this);
-			
-			var item = this.getItems().get(pos);
-			
-			/* Element div */
-			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item", componentHash]), "data-pos": pos, "key": item}));
-			
-			/* Element div */
-			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_drag", componentHash]), "onMousedown": this.hash(1) ? this.hash(1) : this.hash(1, (e) =>
-			{
-				this.onMouseDown(e, item);
-			})}));
-			__v1.push("@raw");
-			__v1.push("&#9776;");
-			
-			/* Element div */
-			let __v2 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_value", componentHash])}));
-			__v2.push(this.renderValue(pos, item));
-			
-			/* Element div */
-			let __v3 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_remove", componentHash]), "onClick": this.hash(2) ? this.hash(2) : this.hash(2, (e) =>
-			{
-				this.removeItem(pos);
-			})}));
-			__v3.push("@raw");
-			__v3.push("&#10005;");
-			
-			return __v;
-		},
-		renderItems: function()
-		{
-			const rs = use("Runtime.rs");
-			const componentHash = rs.getComponentHash(this.getClassName());
-			let __v = new Runtime.VirtualDom(this);
-			
-			/* Element div */
-			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__items", componentHash])}));
-			
-			var items = this.getItems();
-			if (items)
-			{
-				/* Element TransitionGroup */
-				let __v1 = __v0.element(TransitionGroup, new Runtime.Map({"name": "widget_sortable_list"}));
-				
-				/* Content */
-				__v1.slot("default", () =>
-				{
-					const rs = use("Runtime.rs");
-					const componentHash = rs.getComponentHash(this.getClassName());
-					let __v = new Runtime.VirtualDom(this);
-					
-					for (var i = 0; i < items.count(); i++)
-					{
-						__v.push(this.renderItem(i));
-					}
-					
-					return __v;
-				});
-			}
-			
-			return __v;
-		},
-		renderButtons: function()
-		{
-			const rs = use("Runtime.rs");
-			const componentHash = rs.getComponentHash(this.getClassName());
-			let __v = new Runtime.VirtualDom(this);
-			
-			if (this.show_buttons == "true")
-			{
-				/* Element div */
-				let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__buttons", componentHash])}));
-				
-				/* Element Runtime.Widget.Button */
-				let __v1 = __v0.element(Runtime.Widget.Button, new Runtime.Map({"styles": new Runtime.Vector("small"), "onClick": this.hash(3) ? this.hash(3) : this.hash(3, (event) =>
-				{
-					this.onAddItemClick();
-				})}));
-				
-				/* Content */
-				__v1.slot("default", () =>
-				{
-					const rs = use("Runtime.rs");
-					const componentHash = rs.getComponentHash(this.getClassName());
-					let __v = new Runtime.VirtualDom(this);
-					__v.push("Add");
-					return __v;
-				});
-			}
-			
-			return __v;
-		},
-		render: function()
-		{
-			const rs = use("Runtime.rs");
-			const componentHash = rs.getComponentHash(this.getClassName());
-			let __v = new Runtime.VirtualDom(this);
-			
-			/* Element div */
-			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list", componentHash])}));
-			__v0.push(this.renderItems());
-			__v0.push(this.renderButtons());
-			
-			/* Element div */
-			__v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__shadow", componentHash]), "@ref": "shadow"}));
-			
-			return __v;
-		},
-		/**
-		 * Returns items
-		 */
-		getItems: function(){ return this.value; },
-		/**
-		 * Create new item
-		 */
-		createItem: function(){ return ""; },
-		/**
-		 * Create value
-		 */
-		createValue: function(){ return new Runtime.Vector(); },
-		/**
-		 * Swap items
-		 */
-		swapItems: function(a, b)
-		{
-			if (a > b)
-			{
-				var c = a;
-				a = b;
-				b = c;
-			}
-			var items = this.getItems();
-			var obj_a = items.get(a);
-			var obj_b = items.get(b);
-			items.remove(b);
-			items.insert(b, obj_a);
-			items.remove(a);
-			items.insert(a, obj_b);
-		},
-		/**
-		 * Remove item
-		 */
-		removeItem: function(pos)
-		{
-			var items = this.getItems();
-			this.old_value = Runtime.Serializer.copy(this.value);
-			items.remove(pos);
-			this.onValueChange();
-		},
-		/**
-		 * Returns drag & drop element from point
-		 */
-		getDragElementFromPoint: function(x, y)
-		{
-			var items = document.elementsFromPoint(x, y);
-			for (var i = 0; i < items.length; i++)
-			{
-				var elem = items[i];
-				if (elem.parentElement == this.shadow_elem) continue;
-				if (elem.classList.contains("widget_sortable_list__item")) return elem;
-			}
-			return null;
-		},
-		/**
-		 * Returns drag & drop element
-		 */
-		getDragElement: function(elem)
-		{
-			if (elem.classList.contains("widget_sortable_list__item")) return elem;
-			if (elem.parentElement.classList.contains("widget_sortable_list__item"))
-			{
-				return elem.parentElement;
-			}
-			return null;
-		},
-		/**
-		 * Create shadow elem
-		 */
-		createShadow: function()
-		{
-			if (!this.drag_elem) return;
-			this.shadow_elem = document.createElement("div");
-			this.shadow_elem.innerHTML = this.drag_elem.outerHTML;
-			this.shadow_elem.classList.add("widget_sortable_list__shadow_elem");
-			var arr = Runtime.rs.split(" ", this.constructor.getCssHash(this.constructor.getClassName()));
-			arr = arr.filter(Runtime.lib.equalNot(""));
-			for (var i = 0; i < arr.count(); i++)
-			{
-				this.shadow_elem.classList.add(arr.get(i));
-			}
-			this.shadow_elem.style.height = this.drag_elem.offsetHeight + String("px");
-			this.shadow_elem.style.width = this.drag_elem.offsetWidth + String("px");
-			this.getRef("shadow").appendChild(this.shadow_elem);
-		},
-		/**
-		 * Move shadow element
-		 */
-		moveShadow: function(x, y)
-		{
-			if (!this.shadow_elem) return;
-			var left = x - this.drag_start_point.get("shift_x");
-			var top = y - this.drag_start_point.get("shift_y");
-			this.shadow_elem.style.left = left + String("px");
-			this.shadow_elem.style.top = top + String("px");
-		},
-		/**
-		 * Start Drag & Drop
-		 */
-		startDrag: function(e)
-		{
-			if (this.is_drag != false) return false;
-			if (this.drag_start_point == null) return false;
-			/* Check move */
-			var move_x = Runtime.Math.abs(e.pageX - this.drag_start_point.get("x"));
-			var move_y = Runtime.Math.abs(e.pageY - this.drag_start_point.get("y"));
-			if (move_x < 10 && move_y < 10) return false;
-			/* Start drag */
-			this.is_drag = true;
-			this.createShadow();
-			return true;
-		},
-		/**
-		 * Stop drag & drop
-		 */
-		stopDrag: function()
-		{
-			if (!this.is_drag) return;
-			this.is_drag = false;
-			this.is_transition = false;
-			this.drag_elem = null;
-			this.drag_start_point = null;
-			this.shadow_elem.remove();
-			this.shadow_elem = null;
-		},
-		/**
-		 * Move drag & drop
-		 */
-		moveDrag: function(e)
-		{
-			if (!this.is_drag) return;
-			this.moveShadow(e.pageX, e.pageY);
-			if (this.is_transition) return;
-			var elem = this.getDragElementFromPoint(e.pageX, e.pageY);
-			if (!elem) return;
-			var pos = elem.getAttribute("data-pos");
-			if (pos == this.drag_item_pos) return;
-			/* Swap items with animation */
-			this.is_transition = true;
-			this.old_value = Runtime.Serializer.copy(this.value);
-			this.swapItems(this.drag_item_pos, pos);
-			this.drag_item_pos = pos;
-			/* Stop animation */
-			window.setTimeout(() =>
-			{
-				this.is_transition = false;
-			}, this.duration);
-			/* Send value change */
-			this.onValueChange();
-		},
-		/**
-		 * On value change
-		 */
-		onValueChange: function()
-		{
-			this.emit("valueChange", new Runtime.Web.Messages.ValueChangeMessage(Runtime.Map.create({
-				"value": this.value,
-				"old_value": this.old_value,
-				"data": this.data,
-			})));
-		},
-		/**
-		 * Add item click
-		 */
-		onAddItemClick: function()
-		{
-			var items = this.getItems();
-			if (items == null)
-			{
-				this.emit("valueChange", new Runtime.Web.Messages.ValueChangeMessage(Runtime.Map.create({
-					"value": this.createValue(),
-					"old_value": this.old_value,
-					"data": this.data,
-				})));
-			}
-			this.nextTick(() =>
-			{
-				this.old_value = Runtime.Serializer.copy(this.value);
-				var items = this.getItems();
-				items.push(this.createItem());
-				this.onValueChange();
-			});
-		},
-		/**
-		 * Mouse down
-		 */
-		onMouseDown: function(e, item)
-		{
-			if (e.button != 0) return;
-			if (this.is_drag) return;
-			/* Set start drag item */
-			this.drag_elem = this.getDragElement(e.target);
-			this.drag_item = item;
-			this.drag_item_pos = this.drag_elem.getAttribute("data-pos");
-			this.drag_start_point = Runtime.Map.create({
-				"x": e.pageX,
-				"y": e.pageY,
-				"shift_x": e.pageX - e.target.offsetLeft,
-				"shift_y": e.pageY - e.target.offsetTop,
-			});
-			/* Add event listener */
-			document.addEventListener("mouseup", this.onMouseUp);
-			document.addEventListener("mousemove", this.onMouseMove);
-			e.preventDefault();
-			return false;
-		},
-		/**
-		 * Mouse tree up
-		 */
-		onMouseUp: function(e)
-		{
-			/* Remove event listener */
-			document.removeEventListener("mouseup", this.onMouseUp);
-			document.removeEventListener("mousemove", this.onMouseMove);
-			/* Stop drag & drop */
-			this.stopDrag();
-		},
-		/**
-		 * Mouse move
-		 */
-		onMouseMove: function(e)
-		{
-			if (this.drag_elem == null) return;
-			/* Try to start drag & drop */
-			if (!this.is_drag) this.startDrag(e);
-			if (!this.is_drag) return;
-			/* Move Drag & Drop */
-			this.moveDrag(e);
-		},
-		getClassName: function(){ return "Runtime.Widget.SortableList"; },
-	},
-	getComponentStyle: function(){ return ".widget_sortable_list.h-2646{position: relative}.widget_sortable_list__item.h-2646{display: flex;align-items: center;justify-content: flex-start;border-width: var(--widget-border-width);border-color: var(--widget-color-border);border-style: solid;border-radius: 4px;margin: 5px}.widget_sortable_list__item_drag,\n.widget_sortable_list__item_remove.h-2646{cursor: pointer;padding: 0px 5px}.widget_sortable_list__item_value.h-2646{flex: 1}.widget_sortable_list__item_value.h-2646 %(Input)widget_input, %(Select)widget_select{padding: 0px 10px;border-color: transparent;border-radius: 0;border-width: 0}.widget_sortable_list__buttons.h-2646{text-align: center;margin-top: var(--widget-space)}.widget_sortable_list__shadow_elem.h-2646{position: absolute;opacity: 0.5;user-select: none;z-index: 9999999}.widget_sortable_list__shadow_elem.h-2646 .widget_sortable_list__item_drag{cursor: grabbing}.widget_sortable_list__shadow_elem.h-2646 .widget_sortable_list__item{margin: 0}.widget_sortable_list-move,\n.widget_sortable_list-enter-active,\n.widget_sortable_list-leave-active.h-2646{transition: all 0.3s ease}.widget_sortable_list-enter-from,\n.widget_sortable_list-leave-to.h-2646{opacity: 0}"; },
-	getRequiredComponents: function(){ return new Runtime.Vector("Runtime.Widget.Button", "Runtime.Widget.Input", "Runtime.Widget.Select"); },
-};
-window["Runtime.Widget.SortableList"] = Runtime.Widget.SortableList;
-"use strict;"
-/*
- *  BayLang Technology
- *
- *  (c) Copyright 2016-2024 "Ildar Bikmamatov" <support@bayrell.org>
- *
- *  Licensed under the Apache License, Version 2.0 (the "License");
- *  you may not use this file except in compliance with the License.
- *  You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
-*/
-if (typeof Runtime == 'undefined') Runtime = {};
-if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
-Runtime.Widget.SortableFieldList = {
-	name: "Runtime.Widget.SortableFieldList",
-	extends: Runtime.Widget.SortableList,
-	data: function()
-	{
-		return {
-			fields: new Runtime.Vector(),
-		};
-	},
-	methods:
-	{
-		renderValueItem: function(field, pos, item)
-		{
-			const rs = use("Runtime.rs");
-			const componentHash = rs.getComponentHash(this.getClassName());
-			let __v = new Runtime.VirtualDom(this);
-			
-			/* Element div */
-			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_value_row", componentHash])}));
-			
-			/* Element div */
-			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_value_label", componentHash])}));
-			__v1.push(field.get("label"));
-			
-			/* Element div */
-			let __v2 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_value_item", componentHash])}));
-			
-			if (item)
-			{
-				var field_name = field.get("name");
-				var field_component = field.get("component");
-				var field_props = field.get("props");
-				
-				/* Element field_component */
-				__v2.element(Runtime.rtl.findClass(field_component), new Runtime.Map({"name": field_name, "value": item.get(field_name), "onValueChange": this.hash(0) ? this.hash(0) : this.hash(0, (message) =>
-				{
-					item.set(field_name, message.value);
-					this.onValueChange();
-				})}).concat(field_props));
-			}
-			
-			return __v;
-		},
-		renderValue: function(pos, item)
-		{
-			const rs = use("Runtime.rs");
-			const componentHash = rs.getComponentHash(this.getClassName());
-			let __v = new Runtime.VirtualDom(this);
-			
-			for (var i = 0; i < this.fields.count(); i++)
-			{
-				var field = this.fields.get(i);
-				__v.push(this.renderValueItem(field, pos, item));
-			}
-			
-			return __v;
-		},
-		renderItem: function(pos)
-		{
-			const rs = use("Runtime.rs");
-			const componentHash = rs.getComponentHash(this.getClassName());
-			let __v = new Runtime.VirtualDom(this);
-			
-			var item = this.getItems().get(pos);
-			
-			/* Element div */
-			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item", componentHash]), "data-pos": pos, "key": item}));
-			
-			/* Element div */
-			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_element widget_sortable_list__item_element--drag", componentHash])}));
-			
-			/* Element div */
-			let __v2 = __v1.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_drag", componentHash]), "onMousedown": this.hash(1) ? this.hash(1) : this.hash(1, (e) =>
-			{
-				this.onMouseDown(e, item);
-			})}));
-			__v2.push("@raw");
-			__v2.push("&#9776;");
-			
-			/* Element div */
-			let __v3 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_value", componentHash])}));
-			__v3.push(this.renderValue(pos, item));
-			
-			/* Element div */
-			let __v4 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_element widget_sortable_list__item_element--remove", componentHash])}));
-			
-			/* Element div */
-			let __v5 = __v4.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_remove", componentHash]), "onClick": this.hash(2) ? this.hash(2) : this.hash(2, (e) =>
-			{
-				this.removeItem(pos);
-			})}));
-			__v5.push("@raw");
-			__v5.push("&#10005;");
-			
-			return __v;
-		},
-		/**
-		 * Create new item
-		 */
-		createItem: function(){ return new Runtime.Map(); },
-		/**
-		 * Returns drag & drop element
-		 */
-		getDragElement: function(elem)
-		{
-			if (elem.classList.contains("widget_sortable_list__item")) return elem;
-			if (elem.parentElement.classList.contains("widget_sortable_list__item"))
-			{
-				return elem.parentElement;
-			}
-			if (elem.parentElement.parentElement.classList.contains("widget_sortable_list__item"))
-			{
-				return elem.parentElement.parentElement;
-			}
-			return null;
-		},
-		getClassName: function(){ return "Runtime.Widget.SortableFieldList"; },
-	},
-	getComponentStyle: function(){ return ".widget_sortable_list__item.h-a548{align-items: stretch;margin: 10px 0px}.widget_sortable_list__item_element.h-a548{display: flex}.widget_sortable_list__item_element--drag.h-a548{align-items: center}.widget_sortable_list__item_element--remove.h-a548{align-items: start}.widget_sortable_list__item_value.h-a548{padding: 5px}.widget_sortable_list__item_value.h-a548 %(Input)widget_input, %(Select)widget_select{border-bottom: 1px var(--widget-color-border) solid;box-shadow: none;outline: none}.widget_sortable_list__item_value_row.h-a548{display: flex;align-items: center;margin-bottom: 1px}.widget_sortable_list__item_value_label.h-a548{width: 80px}.widget_sortable_list__item_value_item.h-a548{flex: 1}"; },
-	getRequiredComponents: function(){ return new Runtime.Vector("Runtime.Widget.Input", "Runtime.Widget.Select"); },
-};
-window["Runtime.Widget.SortableFieldList"] = Runtime.Widget.SortableFieldList;
-"use strict;"
-/*
- *  BayLang Technology
- *
  *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -10184,7 +10946,7 @@ Runtime.Widget.Tag = {
 	extends: Runtime.Component,
 	props: {
 		name: {default: ""},
-		value: {default: new Runtime.Vector()},
+		value: {default: Runtime.Vector.create([])},
 	},
 	methods:
 	{
@@ -10498,7 +11260,8 @@ Runtime.Widget.TextArea = {
 			let props = this.getProps();
 			
 			/* Element textarea */
-			__v.element("textarea", new Runtime.Map({"class": rs.className(["textarea", this.class, componentHash]), "name": this.name, "placeholder": this.placeholder, "style": this.getStyle(), "@ref": "textarea", "onChange": this.onChange, "onKeydown": this.onKeyDown}).concat(props));
+			let __v0 = __v.element("textarea", new Runtime.Map({"class": rs.className(["textarea", this.class, componentHash]), "name": this.name, "placeholder": this.placeholder, "style": this.getStyle(), "@ref": "textarea", "onChange": this.onChange, "onKeydown": this.onKeyDown}).concat(props));
+			__v0.push(this.value);
 			
 			return __v;
 		},
@@ -10507,7 +11270,7 @@ Runtime.Widget.TextArea = {
 		 */
 		getStyle: function()
 		{
-			let content = new Runtime.Vector();
+			let content = Runtime.Vector.create([]);
 			if (this.height) content.push("min-height: " + String(this.height));
 			return Runtime.rs.join(";", content);
 		},
@@ -10550,7 +11313,7 @@ Runtime.Widget.TextArea = {
 		let textarea = this.getRef("textarea");
 		textarea.value = this.value;
 	},
-	getComponentStyle: function(){ return ".textarea.h-ee81{width: 100%;max-width: 100%;font-family: var(--font-family);font-size: var(--font-input-size);padding: calc(var(--space) * 0.75) calc(var(--space) * 1.5);background-color: var(--color-default);border-width: var(--border-width);border-color: var(--color-border);border-style: solid;border-radius: var(--space);box-shadow: none;outline: transparent;line-height: normal;transition: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.textarea.h-ee81:focus{outline: transparent}"; },
+	getComponentStyle: function(){ return ".textarea.h-ee81{width: 100%;max-width: 100%;font-family: var(--font-family);font-size: var(--font-input-size);padding: calc(var(--space) * 0.75) calc(var(--space) * 1.5);background-color: var(--color-background);border-width: var(--border-width);border-color: var(--color-border);border-style: solid;border-radius: var(--space);box-shadow: none;outline: transparent;line-height: normal;transition: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.textarea.h-ee81:focus{outline: transparent}"; },
 	getRequiredComponents: function(){ return new Runtime.Vector(); },
 };
 window["Runtime.Widget.TextArea"] = Runtime.Widget.TextArea;
@@ -10796,7 +11559,7 @@ Runtime.Widget.TextImage = {
 		 */
 		getClass: function()
 		{
-			let styles = new Runtime.Vector();
+			let styles = Runtime.Vector.create([]);
 			styles.push("widget_text_image--" + String(this.kind));
 			return Runtime.rs.join(" ", styles);
 		},
@@ -11019,9 +11782,9 @@ Runtime.Widget.ModuleDescription = class
 	 */
 	static entities()
 	{
-		return new Runtime.Vector(
+		return Runtime.Vector.create([
 			new Runtime.Entity.Hook("Runtime.Widget.AppHook"),
-		);
+		]);
 	}
 	
 	
@@ -11035,3 +11798,4345 @@ Runtime.Widget.ModuleDescription = class
 	static getInterfaces(){ return []; }
 };
 window["Runtime.Widget.ModuleDescription"] = Runtime.Widget.ModuleDescription;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.ContextMenu == 'undefined') Runtime.Widget.ContextMenu = {};
+Runtime.Widget.ContextMenu.ContextMenu = {
+	name: "Runtime.Widget.ContextMenu.ContextMenu",
+	extends: Runtime.Component,
+	methods:
+	{
+		renderItem: function(item)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["context_menu__item", item.get("hidden") == true ? "hidden" : "", componentHash]), "key": item.get("key"), "onClick": this.hash(0) ? this.hash(0) : this.hash(0, (event) =>
+			{
+				this.onClickItem(item);
+			})}));
+			__v0.push(item.get("label"));
+			
+			return __v;
+		},
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			let props = this.getProps();
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["context_menu", this.model.is_open ? "context_menu--open" : "context_menu--hide", componentHash]), "@ref": "widget"}).concat(props));
+			
+			for (let i = 0; i < this.model.items.count(); i++)
+			{
+				let item = this.model.items.get(i);
+				__v0.push(this.renderItem(item));
+			}
+			
+			return __v;
+		},
+		/**
+		 * Returns props
+		 */
+		getProps: function()
+		{
+			let styles = Runtime.Vector.create([]);
+			if (this.model.width != "")
+			{
+				styles.push("max-width: " + String(this.model.width));
+			}
+			styles.push("left: " + String(this.model.x) + String("px;"));
+			styles.push("top: " + String(this.model.y) + String("px;"));
+			return Runtime.Map.create({
+				"style": Runtime.rs.join(";", styles),
+			});
+		},
+		/**
+		 * Click item
+		 */
+		onClickItem: function(item)
+		{
+			this.model.onClickItem(item);
+		},
+		getClassName: function(){ return "Runtime.Widget.ContextMenu.ContextMenu"; },
+	},
+	getComponentStyle: function(){ return ".context_menu.h-eb02{display: none;position: absolute;z-index: 99;background-color: var(--color-background);border: var(--border-width) var(--color-border) solid;border-bottom-width: 0}.context_menu--open.h-eb02{display: block}.context_menu__item.h-eb02{padding: calc(var(--space) * 0.75) var(--space);border-bottom: var(--border-width) var(--color-border) solid;cursor: pointer;user-select: none}.context_menu__item.h-eb02:hover{background-color: var(--color-hover)}.context_menu__item.hidden.h-eb02{display: none}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector(); },
+};
+window["Runtime.Widget.ContextMenu.ContextMenu"] = Runtime.Widget.ContextMenu.ContextMenu;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.ContextMenu == 'undefined') Runtime.Widget.ContextMenu = {};
+Runtime.Widget.ContextMenu.ContextMenuMessage = class extends Runtime.Message
+{
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.item = null;
+	}
+	static getClassName(){ return "Runtime.Widget.ContextMenu.ContextMenuMessage"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.ContextMenu.ContextMenuMessage"] = Runtime.Widget.ContextMenu.ContextMenuMessage;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.ContextMenu == 'undefined') Runtime.Widget.ContextMenu = {};
+Runtime.Widget.ContextMenu.ContextMenuModel = class extends Runtime.BaseModel
+{
+	/**
+	 * Init widget params
+	 */
+	initParams(params)
+	{
+		super.initParams(params);
+		if (params == null) return;
+		if (params.has("items")) this.items = params.get("items");
+	}
+	
+	
+	/**
+	 * Set width
+	 */
+	setWidth(value)
+	{
+		this.width = value;
+	}
+	
+	
+	/**
+	 * Show dialog
+	 */
+	show(x, y)
+	{
+		this.is_open = true;
+		this.x = x;
+		this.y = y;
+	}
+	
+	
+	/**
+	 * Hide dialog
+	 */
+	hide()
+	{
+		this.is_open = false;
+	}
+	
+	
+	/**
+	 * Add item
+	 */
+	addItem(item)
+	{
+		this.items.push(item);
+	}
+	
+	
+	/**
+	 * Find index
+	 */
+	find(key)
+	{
+		return this.items.find((item) => { return item.get("key") == key; });
+	}
+	
+	
+	/**
+	 * Find item
+	 */
+	findItem(key){ return this.items.get(this.find(key)); }
+	
+	
+	/**
+	 * On click
+	 */
+	onClickItem(item)
+	{
+		this.listener.emit(new Runtime.Widget.ContextMenu.ContextMenuMessage(Runtime.Map.create({
+			"name": "clickItem",
+			"item": item,
+		})));
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.component = "Runtime.Widget.ContextMenu.ContextMenu";
+		this.widget_name = "context_menu";
+		this.is_open = false;
+		this.width = "";
+		this.x = 0;
+		this.y = 0;
+		this.items = Runtime.Vector.create([]);
+		this.data = null;
+	}
+	static getClassName(){ return "Runtime.Widget.ContextMenu.ContextMenuModel"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.ContextMenu.ContextMenuModel"] = Runtime.Widget.ContextMenu.ContextMenuModel;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Dialog == 'undefined') Runtime.Widget.Dialog = {};
+Runtime.Widget.Dialog.Dialog = {
+	name: "Runtime.Widget.Dialog.Dialog",
+	extends: Runtime.Component,
+	props: {
+		model: {default: null},
+		modal: {default: true},
+	},
+	methods:
+	{
+		renderTitle: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			__v.push(this.renderSlot("title"));
+			
+			return __v;
+		},
+		renderHeader: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["dialog__header", componentHash])}));
+			
+			/* Element div */
+			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["dialog__header_title", componentHash])}));
+			__v1.push(this.renderTitle());
+			
+			/* Element Runtime.Widget.Button */
+			let __v2 = __v0.element("Runtime.Widget.Button", new Runtime.Map({"class": rs.className(["dialog__header_close button--small", componentHash]), "onClick": this.hash(0) ? this.hash(0) : this.hash(0, (event) =>
+			{
+				this.onCloseClick();
+			})}));
+			
+			/* Content */
+			__v2.slot("default", () =>
+			{
+				const rs = use("Runtime.rs");
+				const componentHash = rs.getComponentHash(this.getClassName());
+				let __v = new Runtime.VirtualDom(this);
+				
+				/* Element svg */
+				let __v0 = __v.element("svg", new Runtime.Map({"width": "16", "height": "16", "viewBox": "0 0 16 16", "fill": "none", "xmlns": "http://www.w3.org/2000/svg"}));
+				
+				/* Element path */
+				__v0.element("path", new Runtime.Map({"d": "M12 4L4 12", "stroke": "currentColor", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round"}));
+				
+				/* Element path */
+				__v0.element("path", new Runtime.Map({"d": "M4 4L12 12", "stroke": "currentColor", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round"}));
+				
+				return __v;
+			});
+			
+			return __v;
+		},
+		renderContent: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["dialog__content", componentHash])}));
+			__v0.push(this.renderSlot("content"));
+			
+			return __v;
+		},
+		renderFooter: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			if (this.slot("footer"))
+			{
+				/* Element div */
+				let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["dialog__footer", componentHash])}));
+				__v0.push(this.renderSlot("footer"));
+			}
+			
+			return __v;
+		},
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["dialog", this.model.is_open ? "dialog--open" : "", componentHash]), "onClick": this.hash(1) ? this.hash(1) : this.hash(1, (event) =>
+			{
+				this.onOverlayClick();
+			})}));
+			
+			/* Element div */
+			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["dialog__container", componentHash]), "onClick": this.hash(2) ? this.hash(2) : this.hash(2, (event) =>
+			{
+				event.stopPropagation();
+			})}));
+			__v1.push(this.renderHeader());
+			__v1.push(this.renderContent());
+			__v1.push(this.renderFooter());
+			
+			return __v;
+		},
+		/**
+		 * Overlay click
+		 */
+		onOverlayClick: function()
+		{
+			if (!this.modal)
+			{
+				this.model.hide();
+			}
+		},
+		/**
+		 * Close button click
+		 */
+		onCloseClick: function()
+		{
+			this.model.hide();
+		},
+		getClassName: function(){ return "Runtime.Widget.Dialog.Dialog"; },
+	},
+	/**
+	 * Update component
+	 */
+	updated: function()
+	{
+		let body = document.getElementsByTagName("body")[0];
+		if (this.model.is_open)
+		{
+			if (!body.classList.contains("scroll-lock"))
+			{
+				body.classList.add("scroll-lock");
+			}
+		}
+		else
+		{
+			if (body.classList.contains("scroll-lock"))
+			{
+				body.classList.remove("scroll-lock");
+			}
+		}
+	},
+	getComponentStyle: function(){ return ".dialog.h-a5bb{display: none;position: fixed;top: 0;left: 0;width: 100%;height: 100%;background-color: rgba(0, 0, 0, 0.2);z-index: 99999;align-items: center;justify-content: center;overflow-y: auto}.dialog--open.h-a5bb{display: grid}.dialog__container.h-a5bb{background-color: var(--color-background);border-radius: var(--border-radius);box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);width: 600px;margin: calc(var(--space) * 2) auto}.dialog__content.h-a5bb{padding: calc(var(--space) * 2)}.dialog__header.h-a5bb{padding: var(--space) calc(var(--space) * 2);border-bottom: 1px solid var(--color-border);display: flex;justify-content: space-between;align-items: center;font-weight: bold;font-size: 1.2em}.dialog__header.h-a5bb .button{font-size: 1.5em;line-height: 0;border: none}.dialog__footer.h-a5bb{padding: calc(var(--space) * 2);padding-top: var(--space);display: flex;justify-content: flex-end;gap: var(--space)}@media (max-width: 768px){.dialog__content_wrapper.h-a5bb{width: 95%}.dialog__header.h-a5bb{font-size: 1.1em;padding: 10px 15px}.dialog__content.h-a5bb{padding: 15px}.dialog__footer.h-a5bb{padding: 10px 15px}}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector(); },
+};
+window["Runtime.Widget.Dialog.Dialog"] = Runtime.Widget.Dialog.Dialog;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Dialog == 'undefined') Runtime.Widget.Dialog = {};
+Runtime.Widget.Dialog.DialogMessage = class extends Runtime.Message
+{
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.action = "";
+		this.value = "";
+	}
+	static getClassName(){ return "Runtime.Widget.Dialog.DialogMessage"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Dialog.DialogMessage"] = Runtime.Widget.Dialog.DialogMessage;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Dialog == 'undefined') Runtime.Widget.Dialog = {};
+Runtime.Widget.Dialog.DialogModel = class extends Runtime.BaseModel
+{
+	/**
+	 * Show dialog
+	 */
+	show()
+	{
+		this.is_open = true;
+	}
+	
+	
+	/**
+	 * Hide dialog
+	 */
+	hide()
+	{
+		this.is_open = false;
+		this.listener.emit(new Runtime.Widget.Dialog.DialogMessage(Runtime.Map.create({
+			"name": "hide",
+		})));
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.is_open = false;
+	}
+	static getClassName(){ return "Runtime.Widget.Dialog.DialogModel"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Dialog.DialogModel"] = Runtime.Widget.Dialog.DialogModel;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Dialog == 'undefined') Runtime.Widget.Dialog = {};
+Runtime.Widget.Dialog.ConfirmDialog = {
+	name: "Runtime.Widget.Dialog.ConfirmDialog",
+	extends: Runtime.Widget.Dialog.Dialog,
+	methods:
+	{
+		renderTitle: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			if (this.slot("title"))
+			{
+				__v.push(this.renderSlot("title"));
+			}
+			else
+			{
+				__v.push(this.model.title);
+			}
+			
+			return __v;
+		},
+		renderContent: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["dialog__content", componentHash])}));
+			
+			if (this.slot("content"))
+			{
+				__v0.push(this.renderSlot("content"));
+			}
+			else
+			{
+				__v0.push(this.model.content);
+			}
+			__v0.push(this.renderWidget(this.model.result, Runtime.Map.create({
+				"class": "result--center",
+			})));
+			
+			return __v;
+		},
+		renderFooter: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["dialog__footer", componentHash])}));
+			
+			/* Element Runtime.Widget.Button */
+			let __v1 = __v0.element("Runtime.Widget.Button", new Runtime.Map({"onClick": this.hash(0) ? this.hash(0) : this.hash(0, (event) =>
+			{
+				this.model.hide();
+			})}));
+			
+			/* Content */
+			__v1.slot("default", () =>
+			{
+				const rs = use("Runtime.rs");
+				const componentHash = rs.getComponentHash(this.getClassName());
+				let __v = new Runtime.VirtualDom(this);
+				__v.push("Close");
+				return __v;
+			});
+			
+			/* Element Runtime.Widget.Button */
+			let __v2 = __v0.element("Runtime.Widget.Button", new Runtime.Map({"class": rs.className(["button--primary", componentHash]), "styles": this.model.title_button_styles, "onClick": this.hash(1) ? this.hash(1) : this.hash(1, (event) =>
+			{
+				this.model.confirm();
+			})}));
+			
+			/* Content */
+			__v2.slot("default", () =>
+			{
+				const rs = use("Runtime.rs");
+				const componentHash = rs.getComponentHash(this.getClassName());
+				let __v = new Runtime.VirtualDom(this);
+				
+				__v.push(this.model.title_button ? this.model.title_button : "Confirm");
+				
+				return __v;
+			});
+			
+			return __v;
+		},
+		getClassName: function(){ return "Runtime.Widget.Dialog.ConfirmDialog"; },
+	},
+	getComponentStyle: function(){ return ".dialog__content.h-5497 .result{margin-top: calc(var(--space) * 0.5)}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector("Runtime.Widget.Button"); },
+};
+window["Runtime.Widget.Dialog.ConfirmDialog"] = Runtime.Widget.Dialog.ConfirmDialog;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Dialog == 'undefined') Runtime.Widget.Dialog = {};
+Runtime.Widget.Dialog.ConfirmDialogModel = class extends Runtime.Widget.Dialog.DialogModel
+{
+	/**
+	 * Init widget
+	 */
+	initWidget(params)
+	{
+		super.initWidget(params);
+		this.result = this.createWidget("Runtime.Widget.ResultModel");
+	}
+	
+	
+	/**
+	 * Set wait message
+	 */
+	setWaitMessage()
+	{
+		this.result.setWaitMessage();
+	}
+	
+	
+	/**
+	 * Set api result
+	 */
+	setApiResult(result)
+	{
+		this.result.setApiResult(result);
+	}
+	
+	
+	/**
+	 * Show
+	 */
+	show()
+	{
+		super.show();
+		this.result.clear();
+	}
+	
+	
+	/**
+	 * Confirm
+	 */
+	confirm()
+	{
+		this.listener.emit(new Runtime.Widget.Dialog.DialogMessage(Runtime.Map.create({
+			"name": "confirm",
+			"action": this.action,
+		})));
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.component = "Runtime.Widget.Dialog.ConfirmDialog";
+		this.action = "";
+		this.title = "";
+		this.title_button = "";
+		this.title_button_styles = Runtime.Vector.create([]);
+		this.content = "";
+		this.result = null;
+	}
+	static getClassName(){ return "Runtime.Widget.Dialog.ConfirmDialogModel"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Dialog.ConfirmDialogModel"] = Runtime.Widget.Dialog.ConfirmDialogModel;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Dialog == 'undefined') Runtime.Widget.Dialog = {};
+Runtime.Widget.Dialog.PromptDialog = {
+	name: "Runtime.Widget.Dialog.PromptDialog",
+	extends: Runtime.Widget.Dialog.Dialog,
+	methods:
+	{
+		renderTitle: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			if (this.slot("title"))
+			{
+				__v.push(this.renderSlot("title"));
+			}
+			else
+			{
+				__v.push(this.model.title);
+			}
+			
+			return __v;
+		},
+		renderContent: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["dialog__content", componentHash])}));
+			
+			if (this.slot("content"))
+			{
+				__v0.push(this.renderSlot("content"));
+			}
+			else
+			{
+				__v0.push(this.model.content);
+			}
+			
+			/* Element Runtime.Widget.Input */
+			__v0.element("Runtime.Widget.Input", new Runtime.Map({"name": "value", "value": this.model.value, "onChange": this.hash(0) ? this.hash(0) : this.hash(0, (event) =>
+			{
+				this.model.setValue(event.target.value);
+			})}));
+			__v0.push(this.renderWidget(this.model.result, Runtime.Map.create({
+				"class": "result--center",
+			})));
+			
+			return __v;
+		},
+		renderFooter: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["dialog__footer", componentHash])}));
+			
+			/* Element Runtime.Widget.Button */
+			let __v1 = __v0.element("Runtime.Widget.Button", new Runtime.Map({"onClick": this.hash(1) ? this.hash(1) : this.hash(1, (event) =>
+			{
+				this.model.hide();
+			})}));
+			
+			/* Content */
+			__v1.slot("default", () =>
+			{
+				const rs = use("Runtime.rs");
+				const componentHash = rs.getComponentHash(this.getClassName());
+				let __v = new Runtime.VirtualDom(this);
+				__v.push("Close");
+				return __v;
+			});
+			
+			/* Element Runtime.Widget.Button */
+			let __v2 = __v0.element("Runtime.Widget.Button", new Runtime.Map({"class": rs.className(["button--primary", componentHash]), "style": this.model.title_button_styles, "onClick": this.hash(2) ? this.hash(2) : this.hash(2, (event) =>
+			{
+				this.model.confirm();
+			})}));
+			
+			/* Content */
+			__v2.slot("default", () =>
+			{
+				const rs = use("Runtime.rs");
+				const componentHash = rs.getComponentHash(this.getClassName());
+				let __v = new Runtime.VirtualDom(this);
+				
+				__v.push(this.model.title_button ? this.model.title_button : "Confirm");
+				
+				return __v;
+			});
+			
+			return __v;
+		},
+		getClassName: function(){ return "Runtime.Widget.Dialog.PromptDialog"; },
+	},
+	getComponentStyle: function(){ return ".dialog__content.h-688b .result{margin-top: calc(var(--space) * 0.5)}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector("Runtime.Widget.Button", "Runtime.Widget.Input"); },
+};
+window["Runtime.Widget.Dialog.PromptDialog"] = Runtime.Widget.Dialog.PromptDialog;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Dialog == 'undefined') Runtime.Widget.Dialog = {};
+Runtime.Widget.Dialog.PromptDialogModel = class extends Runtime.Widget.Dialog.DialogModel
+{
+	/**
+	 * Init params
+	 */
+	initParams(params)
+	{
+		super.initParams(params);
+		this.result = this.createWidget("Runtime.Widget.ResultModel");
+	}
+	
+	
+	/**
+	 * Set wait message
+	 */
+	setWaitMessage()
+	{
+		this.result.setWaitMessage();
+	}
+	
+	
+	/**
+	 * Set api result
+	 */
+	setApiResult(result)
+	{
+		this.result.setApiResult(result);
+	}
+	
+	
+	/**
+	 * Set value
+	 */
+	setValue(value)
+	{
+		this.value = value;
+	}
+	
+	
+	/**
+	 * Show
+	 */
+	show()
+	{
+		super.show();
+		this.result.clear();
+	}
+	
+	
+	/**
+	 * Confirm
+	 */
+	confirm()
+	{
+		this.listener.emit(new Runtime.Widget.Dialog.DialogMessage(Runtime.Map.create({
+			"name": "confirm",
+			"action": this.action,
+			"value": this.value,
+		})));
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.component = "Runtime.Widget.Dialog.PromptDialog";
+		this.action = "";
+		this.title = "";
+		this.title_button = "";
+		this.title_button_styles = Runtime.Vector.create([]);
+		this.content = "";
+		this.value = "";
+		this.result = null;
+	}
+	static getClassName(){ return "Runtime.Widget.Dialog.PromptDialogModel"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Dialog.PromptDialogModel"] = Runtime.Widget.Dialog.PromptDialogModel;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Form == 'undefined') Runtime.Widget.Form = {};
+Runtime.Widget.Form.Form = {
+	name: "Runtime.Widget.Form.Form",
+	extends: Runtime.Component,
+	props: {
+		fields: {default: Runtime.Vector.create([])},
+	},
+	methods:
+	{
+		renderTitle: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			if (this.slot("title"))
+			{
+				__v.push(this.renderSlot("title"));
+			}
+			
+			return __v;
+		},
+		renderContent: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			if (this.slot("default") && this.fields.count() == 0)
+			{
+				__v.push(this.renderSlot("default"));
+			}
+			else
+			{
+				for (let i = 0; i < this.fields.count(); i++)
+				{
+					let field = this.fields.get(i);
+					let props = field.get("props");
+					let component = field.get("component");
+					let name = field.get("name");
+					if (!props)
+					{
+						props = new Runtime.Map();
+					}
+					
+					/* Element Runtime.Widget.Form.FormRow */
+					let __v0 = __v.element("Runtime.Widget.Form.FormRow", new Runtime.Map({"name": name, "label": field.get("label"), "key": name, "result": this.model.getResult(name)}));
+					
+					/* Content */
+					__v0.slot("default", () =>
+					{
+						const rs = use("Runtime.rs");
+						const componentHash = rs.getComponentHash(this.getClassName());
+						let __v = new Runtime.VirtualDom(this);
+						
+						/* Element component */
+						__v.element(component, new Runtime.Map({"name": name, "value": this.getValue(field), "onValueChange": this.hash(0) ? this.hash(0) : this.hash(0, (event) =>
+						{
+							this.setValue(field, event.value);
+						})}).concat(props));
+						
+						return __v;
+					});
+				}
+				__v.push(this.renderWidget(this.model.result, Runtime.Map.create({
+					"class": "result--form",
+				})));
+			}
+			
+			return __v;
+		},
+		renderButtons: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			if (this.slot("buttons"))
+			{
+				__v.push(this.renderSlot("buttons"));
+			}
+			
+			return __v;
+		},
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element form */
+			let __v0 = __v.element("form", new Runtime.Map({"class": rs.className(["form", componentHash])}));
+			__v0.push(this.renderTitle());
+			__v0.push(this.renderContent());
+			__v0.push(this.renderButtons());
+			
+			return __v;
+		},
+		/**
+		 * Returns value
+		 */
+		getValue: function(field)
+		{
+			if (field.has("value"))
+			{
+				let value = field.get("value");
+				return value(this.model.item);
+			}
+			let name = field.get("name");
+			return this.model.item.get(name);
+		},
+		/**
+		 * Set value
+		 */
+		setValue: function(field, value)
+		{
+			if (field.has("setValue"))
+			{
+				let setValue = field.get("setValue");
+				setValue(this.model.item, value);
+			}
+			else
+			{
+				let name = field.get("name");
+				this.model.setValue(name, value);
+			}
+		},
+		getClassName: function(){ return "Runtime.Widget.Form.Form"; },
+	},
+	getComponentStyle: function(){ return ".form.h-b6a7 textarea{min-height: 300px}.form.h-b6a7 .row_buttons{justify-content: center}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector("Runtime.Widget.Form.FormRow"); },
+};
+window["Runtime.Widget.Form.Form"] = Runtime.Widget.Form.Form;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Form == 'undefined') Runtime.Widget.Form = {};
+Runtime.Widget.Form.FormRow = {
+	name: "Runtime.Widget.Form.FormRow",
+	extends: Runtime.Component,
+	props: {
+		label: {default: ""},
+		result: {default: null},
+	},
+	methods:
+	{
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["form_row", componentHash])}));
+			
+			/* Element label */
+			let __v1 = __v0.element("label");
+			__v1.push(this.label);
+			
+			/* Element div */
+			let __v2 = __v0.element("div", new Runtime.Map({"class": rs.className(["form_row__content", componentHash])}));
+			__v2.push(this.renderSlot("default"));
+			
+			if (this.result)
+			{
+				__v0.push(this.renderWidget(this.result, Runtime.Map.create({
+					"class": "result--field",
+				})));
+			}
+			
+			return __v;
+		},
+		getClassName: function(){ return "Runtime.Widget.Form.FormRow"; },
+	},
+	getComponentStyle: function(){ return ".form_row.h-df7a{margin-bottom: calc(var(--space) * 2)}.form_row.h-df7a:last-child{margin-bottom: calc(var(--space) * 2)}.form_row.h-df7a label{display: block;font-weight: bold;margin-bottom: calc(var(--space) * 0.5)}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector(); },
+};
+window["Runtime.Widget.Form.FormRow"] = Runtime.Widget.Form.FormRow;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Form == 'undefined') Runtime.Widget.Form = {};
+Runtime.Widget.Form.FormModel = class extends Runtime.BaseModel
+{
+	/**
+	 * Serialize object
+	 */
+	static serialize(rules)
+	{
+		super.serialize(rules);
+		rules.addType("pk", rules.params ? rules.params.get("pk_type") : null);
+		rules.addType("item", rules.params ? rules.params.get("item_type") : null);
+		rules.addType("result", new Runtime.Serializer.ObjectType(Runtime.Map.create({"class_name": "Runtime.Widget.ResultModel"})));
+		rules.setup.add((model, rules) =>
+		{
+			model.pk_type = rules.params ? rules.params.get("pk_type") : null;
+			model.item_type = rules.params ? rules.params.get("item_type") : null;
+		});
+	}
+	
+	
+	/**
+	 * Init params
+	 */
+	initParams(params)
+	{
+		super.initParams(params);
+	}
+	
+	
+	/**
+	 * Init widget
+	 */
+	initWidget(params)
+	{
+		super.initWidget(params);
+		this.result = this.createWidget("Runtime.Widget.ResultModel");
+	}
+	
+	
+	/**
+	 * Set wait message
+	 */
+	setWaitMessage()
+	{
+		this.result.setWaitMessage();
+	}
+	
+	
+	/**
+	 * Set api result
+	 */
+	setApiResult(result)
+	{
+		this.result.setApiResult(result);
+		this.setFieldErrors(result.data.get("fields"));
+	}
+	
+	
+	/**
+	 * Set field errors
+	 */
+	setFieldErrors(field_errors)
+	{
+		if (!field_errors) return;
+		this.field_errors = new Runtime.Map();
+		let keys = Runtime.rtl.list(field_errors.keys());
+		for (let i = 0; i < keys.count(); i++)
+		{
+			let field_name = keys.get(i);
+			let messages = field_errors.get(field_name);
+			let message = Runtime.rs.join(", ", messages);
+			let result = new Runtime.Widget.ResultModel();
+			result.setError(message);
+			this.field_errors.set(field_name, result);
+		}
+	}
+	
+	
+	/**
+	 * Returns result
+	 */
+	getResult(name)
+	{
+		return this.field_errors.get(name);
+	}
+	
+	
+	/**
+	 * Set item value
+	 */
+	setValue(name, value)
+	{
+		this.item.set(name, value);
+	}
+	
+	
+	/**
+	 * Set primary key
+	 */
+	setPrimaryKey(item)
+	{
+		if (this.pk_type)
+		{
+			let primary_key = this.pk_type.keys();
+			this.pk = this.pk_type.filter(item.intersect(primary_key), Runtime.Vector.create([]));
+		}
+		else
+		{
+			this.pk = null;
+		}
+	}
+	
+	
+	/**
+	 * Set item
+	 */
+	setItem(item)
+	{
+		this.item = this.item_type ? this.item_type.filter(item, Runtime.Vector.create([])) : item;
+	}
+	
+	
+	/**
+	 * Clear form
+	 */
+	clear()
+	{
+		this.pk = null;
+		this.item = this.data_object ? Runtime.rtl.newInstance(this.data_object) : new Runtime.Map();
+		this.field_errors = new Runtime.Map();
+		this.result.clear();
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.component = "Runtime.Widget.Form.Form";
+		this.pk = null;
+		this.item = new Runtime.Map();
+		this.field_errors = new Runtime.Map();
+		this.result = null;
+		this.pk_type = null;
+		this.item_type = null;
+	}
+	static getClassName(){ return "Runtime.Widget.Form.FormModel"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Form.FormModel"] = Runtime.Widget.Form.FormModel;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Gallery == 'undefined') Runtime.Widget.Gallery = {};
+Runtime.Widget.Gallery.Gallery = {
+	name: "Runtime.Widget.Gallery.Gallery",
+	extends: Runtime.Component,
+	methods:
+	{
+		renderItem: function(pos)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			__v.push(this.renderSlot("default", Runtime.Map.create({
+				"pos": pos,
+				"item": this.model.items.get(pos),
+				"onClick": () =>
+				{
+					this.onClick(pos);
+				},
+			})));
+			
+			return __v;
+		},
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["widget_gallery", this.class, componentHash])}));
+			
+			/* Element div */
+			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_gallery__items", componentHash])}));
+			
+			for (let i = 0; i < this.model.items.count(); i++)
+			{
+				__v1.push(this.renderItem(i));
+			}
+			__v0.push(this.renderWidget(this.model.dialog));
+			
+			return __v;
+		},
+		/**
+		 * On click
+		 */
+		onClick: function(pos)
+		{
+			this.model.dialog.select(pos);
+			this.model.dialog.show();
+		},
+		getClassName: function(){ return "Runtime.Widget.Gallery.Gallery"; },
+	},
+	getComponentStyle: function(){ return ".widget_gallery__items.h-9a67{display: flex;align-items: center;justify-content: space-around;flex-wrap: wrap}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector(); },
+};
+window["Runtime.Widget.Gallery.Gallery"] = Runtime.Widget.Gallery.Gallery;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Gallery == 'undefined') Runtime.Widget.Gallery = {};
+Runtime.Widget.Gallery.GalleryDialog = {
+	name: "Runtime.Widget.Gallery.GalleryDialog",
+	extends: Runtime.Widget.Dialog.Dialog,
+	methods:
+	{
+		renderDialogContainer: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["widget_dialog__container--photo", this.model.getImageContains() ? "widget_dialog__container--photo_contain" : "", componentHash]), "onClick": this.onContainerClick}));
+			
+			/* Element div */
+			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_dialog__image", componentHash])}));
+			
+			/* Element Runtime.Widget.Button */
+			let __v2 = __v1.element("Runtime.Widget.Button", new Runtime.Map({"class": rs.className(["widget_dialog__close", componentHash]), "onClick": this.hash(0) ? this.hash(0) : this.hash(0, () =>
+			{
+				this.model.hide();
+			})}));
+			
+			/* Content */
+			__v2.slot("default", () =>
+			{
+				const rs = use("Runtime.rs");
+				const componentHash = rs.getComponentHash(this.getClassName());
+				let __v = new Runtime.VirtualDom(this);
+				__v.push("x");
+				return __v;
+			});
+			
+			/* Element img */
+			__v1.element("img", new Runtime.Map({"src": this.model.getCurrentImage(), "unselectable": "on"}));
+			
+			/* Element div */
+			__v0.element("div", new Runtime.Map({"class": rs.className(["widget_dialog__clear", componentHash])}));
+			
+			/* Element div */
+			__v0.element("div", new Runtime.Map({"class": rs.className(["widget_dialog__arrow widget_dialog__arrow--left", componentHash]), "onClick": this.hash(1) ? this.hash(1) : this.hash(1, () =>
+			{
+				this.model.prev();
+			})}));
+			
+			/* Element div */
+			__v0.element("div", new Runtime.Map({"class": rs.className(["widget_dialog__arrow widget_dialog__arrow--right", componentHash]), "onClick": this.hash(2) ? this.hash(2) : this.hash(2, () =>
+			{
+				this.model.next();
+			})}));
+			
+			return __v;
+		},
+		/**
+		 * On container click
+		 */
+		onContainerClick: function(e)
+		{
+			if (e.target.classList.contains("widget_dialog__arrow") || e.target.classList.contains("widget_dialog__clear") || e.target.classList.contains("widget_dialog__close") || e.target.tagName == "IMG")
+			{
+				return;
+			}
+			this.onShadowClick();
+		},
+		getClassName: function(){ return "Runtime.Widget.Gallery.GalleryDialog"; },
+	},
+	getComponentStyle: function(){ return ".widget_dialog__container--photo.h-ebbc{max-width: 1000px;background: transparent;border: 0px transparent solid;padding: 0px;margin: calc(var(--widget-space) * 5) auto;text-align: center}.widget_dialog__arrow.h-ebbc{position: fixed;top: calc(50% - 15px);cursor: pointer;opacity: 0.7}.widget_dialog__arrow.h-ebbc:before, .widget_dialog__arrow.h-ebbc:after{position: absolute;display: block;content: '';width: 0;height: 0;left: 0;top: 0}.widget_dialog__arrow.h-ebbc:hover{opacity: 0.8}.widget_dialog__arrow.h-ebbc:focus{outline: 0}.widget_dialog__arrow.h-ebbc:active{outline: 0;top: calc(50% - 14px)}.widget_dialog__arrow--left.h-ebbc{left: 10px}.widget_dialog__arrow--left.h-ebbc:before{border-top: 40px solid transparent;border-bottom: 40px solid transparent;border-right: 45px solid #3F3F3F}.widget_dialog__arrow--left.h-ebbc:after{left: 6px;top: 10px;border-top: 30px solid transparent;border-bottom: 30px solid transparent;border-right: 35px solid #FFF}.widget_dialog__arrow--right.h-ebbc{right: 70px}.widget_dialog__arrow--right.h-ebbc:before{border-top: 40px solid transparent;border-bottom: 40px solid transparent;border-left: 45px solid #3F3F3F}.widget_dialog__arrow--right.h-ebbc:after{left: 4px;top: 10px;border-top: 30px solid transparent;border-bottom: 30px solid transparent;border-left: 35px solid #FFF}.widget_dialog__image.h-ebbc{position: relative;display: inline-block}.widget_dialog__image.h-ebbc img{max-width: 100%;user-select: none}.widget_dialog__close.h-ebbc{position: absolute;display: flex;align-items: center;justify-content: center;margin: 10px;width: 42px;height: 34px;top: 0;right: 0;font-size: 20px;font-weight: bold;text-transform: uppercase;background-color: #fff;border: 1px #d9d9d9 solid;cursor: pointer;border-radius: 5px}.widget_dialog__shadow.h-ebbc{opacity: 0.5}.widget_dialog__clear.h-ebbc{clear: both}.widget_dialog__container--photo_contain.h-ebbc{text-align: center}.widget_dialog__container--photo_contain.h-ebbc .widget_dialog__image img{max-width: 100%;max-height: calc(100vh - 50px);user-select: none}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector("Runtime.Widget.Button"); },
+};
+window["Runtime.Widget.Gallery.GalleryDialog"] = Runtime.Widget.Gallery.GalleryDialog;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Gallery == 'undefined') Runtime.Widget.Gallery = {};
+Runtime.Widget.Gallery.GalleryDialogModel = class extends Runtime.Widget.Dialog.DialogModel
+{
+	/**
+	 * Returns items
+	 */
+	getItems(){ return this.parent_widget.getItems(); }
+	
+	
+	/**
+	 * Returns item
+	 */
+	getItem(pos){ return this.parent_widget.getItem(pos); }
+	
+	
+	/**
+	 * Returns image
+	 */
+	getImage(pos){ return this.parent_widget.getBigImage(pos); }
+	
+	
+	/**
+	 * Returns true if image is contains
+	 */
+	getImageContains()
+	{
+		return this.parent_widget.dialog_image_contains === true || this.parent_widget.dialog_image_contains == "1" || this.parent_widget.dialog_image_contains == "true";
+	}
+	
+	
+	/**
+	 * Returns current image
+	 */
+	getCurrentImage(){ return this.getImage(this.current); }
+	
+	
+	/**
+	 * Select image
+	 */
+	select(pos)
+	{
+		let count = this.getItems().count();
+		if (count == 0)
+		{
+			this.current = 0;
+			return;
+		}
+		this.current = pos % count;
+		if (this.current < 0)
+		{
+			this.current = (this.current + count) % count;
+		}
+	}
+	
+	
+	/**
+	 * Show prev image
+	 */
+	prev()
+	{
+		this.select(this.current - 1);
+	}
+	
+	
+	/**
+	 * Show next image
+	 */
+	next()
+	{
+		this.select(this.current + 1);
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.component = "Runtime.Widget.Gallery.GalleryDialog";
+		this.current = 0;
+	}
+	static getClassName(){ return "Runtime.Widget.Gallery.GalleryDialogModel"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Gallery.GalleryDialogModel"] = Runtime.Widget.Gallery.GalleryDialogModel;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Gallery == 'undefined') Runtime.Widget.Gallery = {};
+Runtime.Widget.Gallery.GalleryModel = class extends Runtime.BaseModel
+{
+	/**
+	 * Returns items
+	 */
+	getItems(){ return this.items; }
+	
+	
+	/**
+	 * Returns item
+	 */
+	getItem(pos){ return this.items.get(pos); }
+	
+	
+	/**
+	 * Returns small image
+	 */
+	getSmallImage(pos){ return this.getItem(pos); }
+	
+	
+	/**
+	 * Returns big image
+	 */
+	getBigImage(pos){ return this.getItem(pos); }
+	
+	
+	/**
+	 * Init widget params
+	 */
+	initParams(params)
+	{
+		super.initParams(params);
+		if (params == null) return;
+		if (params.has("dialog_image_contains"))
+		{
+			this.dialog_image_contains = params.get("dialog_image_contains");
+		}
+		if (params.has("items")) this.items = params.get("items");
+	}
+	
+	
+	/**
+	 * Init widget settings
+	 */
+	initWidget(params)
+	{
+		super.initWidget(params);
+		/* Add dialog */
+		this.dialog = this.addWidget("Runtime.Widget.Gallery.GalleryDialogModel", Runtime.Map.create({
+			"modal": false,
+		}));
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.component = "Runtime.Widget.Gallery.Gallery";
+		this.widget_name = "gallery";
+		this.dialog_image_contains = false;
+		this.items = Runtime.Vector.create([]);
+		this.dialog = null;
+	}
+	static getClassName(){ return "Runtime.Widget.Gallery.GalleryModel"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Gallery.GalleryModel"] = Runtime.Widget.Gallery.GalleryModel;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Seo == 'undefined') Runtime.Widget.Seo = {};
+Runtime.Widget.Seo.Seo = class extends Runtime.Web.Hooks.AppHook
+{
+	/**
+	 * Create hook
+	 */
+	static hook(params){ if (params == undefined) params = null;return new Runtime.Entity.Hook("Runtime.Widget.Seo.Seo", params); }
+	
+	
+	/**
+	 * Init params
+	 */
+	initParams(params)
+	{
+		super.initParams(params);
+		if (!params) return;
+		if (params.has("class_name")) this.class_name = params.get("class_name");
+	}
+	
+	
+	/**
+	 * Register hooks
+	 */
+	register_hooks()
+	{
+		this.register(Runtime.Hooks.RuntimeHook.CREATE_LAYOUT, "createLayout");
+		this.register(Runtime.Hooks.RuntimeHook.LAYOUT_HEADER, "renderHeader");
+		this.register(Runtime.Web.Hooks.AppHook.ROUTE_BEFORE, "routeBefore");
+	}
+	
+	
+	/**
+	 * Create layout
+	 */
+	createLayout(params)
+	{
+		let container = params.get("container");
+		container.layout.storage.set("seo", container.layout.createWidget("Runtime.Widget.Seo.SeoModel"));
+	}
+	
+	
+	/**
+	 * Render head
+	 */
+	renderHeader(params)
+	{
+		let layout = params.get("layout");
+		let seo = layout.get("seo");
+		if (seo) params.get("components").push(Runtime.VirtualDom.renderModel(seo));
+	}
+	
+	
+	/**
+	 * Route before
+	 */
+	routeBefore(params)
+	{
+		let container = params.get("container");
+		/* If page model exists */
+		if (container.route == null) return;
+		if (container.route.data == null) return;
+		/* Setup route data */
+		let seo = container.layout.get("seo");
+		let route_data = container.route.data;
+		if (route_data.has("title")) container.layout.setPageTitle(route_data.get("title"));
+		if (route_data.has("description")) seo.description = route_data.get("description");
+		if (route_data.has("robots")) seo.robots = route_data.get("robots");
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.class_name = "Runtime.Widget.Seo.SeoModel";
+	}
+	static getClassName(){ return "Runtime.Widget.Seo.Seo"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Seo.Seo"] = Runtime.Widget.Seo.Seo;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Seo == 'undefined') Runtime.Widget.Seo = {};
+Runtime.Widget.Seo.SeoModel = class extends Runtime.BaseModel
+{
+	/**
+	 * Process frontend data
+	 */
+	static serialize(rules)
+	{
+		super.serialize(rules);
+		rules.addType("article_modified_time", new Runtime.Serializer.StringType());
+		rules.addType("article_published_time", new Runtime.Serializer.StringType());
+		rules.addType("canonical_url", new Runtime.Serializer.StringType());
+		rules.addType("description", new Runtime.Serializer.StringType());
+		rules.addType("favicon", new Runtime.Serializer.StringType());
+		rules.addType("robots", new Runtime.Serializer.VectorType(new Runtime.Serializer.StringType()));
+		rules.addType("tags", new Runtime.Serializer.VectorType(new Runtime.Serializer.StringType()));
+	}
+	
+	
+	/**
+	 * Init widget params
+	 */
+	initParams(params)
+	{
+		super.initParams(params);
+		if (params == null) return;
+	}
+	
+	
+	/**
+	 * Set canonical url
+	 */
+	setCanonicalUrl(canonical_url)
+	{
+		/* Add domain */
+		if (this.layout.request_host)
+		{
+			canonical_url = "//" + String(this.layout.request_host) + String(canonical_url);
+			if (this.layout.request_https) canonical_url = "https:" + String(canonical_url);
+			else canonical_url = "http:" + String(canonical_url);
+		}
+		this.canonical_url = canonical_url;
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.component = "Runtime.Widget.Seo.SeoWidget";
+		this.widget_name = "seo";
+		this.canonical_url = "";
+		this.description = "";
+		this.favicon = "";
+		this.article_published_time = "";
+		this.article_modified_time = "";
+		this.robots = Runtime.Vector.create(["follow", "index"]);
+		this.tags = null;
+	}
+	static getClassName(){ return "Runtime.Widget.Seo.SeoModel"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Seo.SeoModel"] = Runtime.Widget.Seo.SeoModel;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Seo == 'undefined') Runtime.Widget.Seo = {};
+Runtime.Widget.Seo.SeoWidget = {
+	name: "Runtime.Widget.Seo.SeoWidget",
+	extends: Runtime.Component,
+	methods:
+	{
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Canonical url */
+			if (this.model.canonical_url)
+			{
+				/* Element link */
+				__v.element("link", new Runtime.Map({"rel": "canonical", "href": this.model.canonical_url}));
+			}
+			/* Locale */
+			/* Element meta */
+			__v.element("meta", new Runtime.Map({"property": "og:locale", "content": this.layout.lang}));
+			/* Title and description */
+			/* Element meta */
+			__v.element("meta", new Runtime.Map({"property": "og:title", "content": this.layout.title}));
+			
+			if (this.model.description != "")
+			{
+				/* Element meta */
+				__v.element("meta", new Runtime.Map({"property": "og:description", "content": this.model.description}));
+				
+				/* Element meta */
+				__v.element("meta", new Runtime.Map({"name": "description", "content": this.model.description}));
+			}
+			/* Site name */
+			let site_name = this.layout.getSiteName();
+			if (site_name)
+			{
+				/* Element meta */
+				__v.element("meta", new Runtime.Map({"property": "og:site_name", "content": site_name}));
+				
+				/* Element meta */
+				__v.element("meta", new Runtime.Map({"property": "article:publisher", "content": site_name}));
+			}
+			/* Robots */
+			if (this.model.robots)
+			{
+				/* Element meta */
+				__v.element("meta", new Runtime.Map({"name": "robots", "content": Runtime.rs.join(",", this.model.robots)}));
+			}
+			/* Tags */
+			if (this.model.tags != null && this.model.tags.count() > 0)
+			{
+				for (let i = 0; i < this.model.tags.count(); i++)
+				{
+					/* Element meta */
+					__v.element("meta", new Runtime.Map({"property": "article:tag", "content": this.model.tags[i]}));
+				}
+			}
+			/* Article time */
+			if (this.model.article_published_time)
+			{
+				/* Element meta */
+				__v.element("meta", new Runtime.Map({"property": "article:published_time", "content": this.model.article_published_time}));
+			}
+			
+			if (this.model.article_modified_time)
+			{
+				/* Element meta */
+				__v.element("meta", new Runtime.Map({"property": "article:article_modified_time", "content": this.model.article_modified_time}));
+				
+				/* Element meta */
+				__v.element("meta", new Runtime.Map({"property": "og:article_modified_time", "content": this.model.article_modified_time}));
+			}
+			
+			return __v;
+		},
+		getClassName: function(){ return "Runtime.Widget.Seo.SeoWidget"; },
+	},
+	getComponentStyle: function(){ return ""; },
+	getRequiredComponents: function(){ return new Runtime.Vector(); },
+};
+window["Runtime.Widget.Seo.SeoWidget"] = Runtime.Widget.Seo.SeoWidget;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Sortable == 'undefined') Runtime.Widget.Sortable = {};
+Runtime.Widget.Sortable.ItemList = {
+	name: "Runtime.Widget.Sortable.ItemList",
+	extends: Runtime.Component,
+	props: {
+		show_buttons: {default: "true"},
+		name: {default: ""},
+		value: {default: Runtime.Vector.create([])},
+	},
+	data: function()
+	{
+		return {
+			old_value: Runtime.Vector.create([]),
+			is_drag: false,
+			is_transition: false,
+			drag_elem: null,
+			drag_item: null,
+			drag_item_pos: -1,
+			shadow_elem: null,
+			drag_elem_css: null,
+			drag_start_point: null,
+			duration: 300,
+		};
+	},
+	methods:
+	{
+		renderValue: function(pos, item)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element Runtime.Widget.Input */
+			__v.element("Runtime.Widget.Input", new Runtime.Map({"value": item, "key": item, "onValueChange": this.hash(0) ? this.hash(0) : this.hash(0, (message) =>
+			{
+				let items = this.getItems();
+				items.set(pos, message.value);
+				this.onValueChange();
+			})}));
+			
+			return __v;
+		},
+		renderItem: function(pos)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			let item = this.getItems().get(pos);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["sortable_list__item", componentHash]), "data-pos": pos, "key": item}));
+			
+			/* Element div */
+			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["sortable_list__item_drag", componentHash]), "onMousedown": this.hash(1) ? this.hash(1) : this.hash(1, (e) =>
+			{
+				this.onMouseDown(e, item);
+			})}));
+			__v1.push("@raw");
+			__v1.push("&#9776;");
+			
+			/* Element div */
+			let __v2 = __v0.element("div", new Runtime.Map({"class": rs.className(["sortable_list__item_value", componentHash])}));
+			__v2.push(this.renderValue(pos, item));
+			
+			/* Element div */
+			let __v3 = __v0.element("div", new Runtime.Map({"class": rs.className(["sortable_list__item_remove", componentHash]), "onClick": this.hash(2) ? this.hash(2) : this.hash(2, (e) =>
+			{
+				this.removeItem(pos);
+			})}));
+			__v3.push("@raw");
+			__v3.push("&#10005;");
+			
+			return __v;
+		},
+		renderItems: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["sortable_list__items", componentHash])}));
+			
+			let items = this.getItems();
+			if (items)
+			{
+				/* Element TransitionGroup */
+				let __v1 = __v0.element("TransitionGroup", new Runtime.Map({"name": "sortable_list"}));
+				
+				/* Content */
+				__v1.slot("default", () =>
+				{
+					const rs = use("Runtime.rs");
+					const componentHash = rs.getComponentHash(this.getClassName());
+					let __v = new Runtime.VirtualDom(this);
+					
+					for (let i = 0; i < items.count(); i++)
+					{
+						__v.push(this.renderItem(i));
+					}
+					
+					return __v;
+				});
+			}
+			
+			return __v;
+		},
+		renderButtons: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			if (this.show_buttons == "true")
+			{
+				/* Element div */
+				let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["sortable_list__buttons", componentHash])}));
+				
+				/* Element Runtime.Widget.Button */
+				let __v1 = __v0.element("Runtime.Widget.Button", new Runtime.Map({"styles": Runtime.Vector.create(["small"]), "onClick": this.hash(3) ? this.hash(3) : this.hash(3, (event) =>
+				{
+					this.onAddItemClick();
+				})}));
+				
+				/* Content */
+				__v1.slot("default", () =>
+				{
+					const rs = use("Runtime.rs");
+					const componentHash = rs.getComponentHash(this.getClassName());
+					let __v = new Runtime.VirtualDom(this);
+					__v.push("Add");
+					return __v;
+				});
+			}
+			
+			return __v;
+		},
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["sortable_list", componentHash])}));
+			__v0.push(this.renderItems());
+			__v0.push(this.renderButtons());
+			
+			/* Element div */
+			__v0.element("div", new Runtime.Map({"class": rs.className(["sortable_list__shadow", componentHash]), "@ref": "shadow"}));
+			
+			return __v;
+		},
+		/**
+		 * Returns items
+		 */
+		getItems: function(){ return this.value; },
+		/**
+		 * Create new item
+		 */
+		createItem: function(){ return ""; },
+		/**
+		 * Copy item
+		 */
+		copyItem: function(item){ return item; },
+		/**
+		 * Create value
+		 */
+		createValue: function(){ return Runtime.Vector.create([]); },
+		/**
+		 * Swap items
+		 */
+		swapItems: function(a, b)
+		{
+			if (a > b)
+			{
+				let c = a;
+				a = b;
+				b = c;
+			}
+			let items = this.getItems();
+			let obj_a = items.get(a);
+			let obj_b = items.get(b);
+			items.remove(b);
+			items.insert(b, obj_a);
+			items.remove(a);
+			items.insert(a, obj_b);
+		},
+		/**
+		 * Remove item
+		 */
+		removeItem: function(pos)
+		{
+			let items = this.getItems();
+			this.old_value = this.value.slice();
+			items.remove(pos);
+			this.onValueChange();
+		},
+		/**
+		 * Returns drag & drop element from point
+		 */
+		getDragElementFromPoint: function(x, y)
+		{
+			let items = document.elementsFromPoint(x, y);
+			for (let i = 0; i < items.length; i++)
+			{
+				let elem = items[i];
+				if (elem.parentElement == this.shadow_elem) continue;
+				if (elem.classList.contains("sortable_list__item")) return elem;
+			}
+			return null;
+		},
+		/**
+		 * Returns drag & drop element
+		 */
+		getDragElement: function(elem)
+		{
+			if (elem.classList.contains("sortable_list__item")) return elem;
+			if (elem.parentElement.classList.contains("sortable_list__item"))
+			{
+				return elem.parentElement;
+			}
+			return null;
+		},
+		/**
+		 * Create shadow elem
+		 */
+		createShadow: function()
+		{
+			if (!this.drag_elem) return;
+			this.shadow_elem = document.createElement("div");
+			this.shadow_elem.innerHTML = this.drag_elem.outerHTML;
+			this.shadow_elem.classList.add("sortable_list__shadow_elem");
+			let arr = Runtime.rs.split(" ", Runtime.rs.getCssHash(this.getClassName()));
+			arr = arr.filter((item) => { return item != ""; });
+			for (let i = 0; i < arr.count(); i++)
+			{
+				this.shadow_elem.classList.add(arr.get(i));
+			}
+			this.shadow_elem.style.height = this.drag_elem.offsetHeight + String("px");
+			this.shadow_elem.style.width = this.drag_elem.offsetWidth + String("px");
+			this.getRef("shadow").appendChild(this.shadow_elem);
+		},
+		/**
+		 * Move shadow element
+		 */
+		moveShadow: function(x, y)
+		{
+			if (!this.shadow_elem) return;
+			let left = x - this.drag_start_point.get("shift_x");
+			let top = y - this.drag_start_point.get("shift_y");
+			this.shadow_elem.style.left = left + String("px");
+			this.shadow_elem.style.top = top + String("px");
+		},
+		/**
+		 * Start Drag & Drop
+		 */
+		startDrag: function(e)
+		{
+			if (this.is_drag != false) return false;
+			if (this.drag_start_point == null) return false;
+			/* Check move */
+			let move_x = Runtime.rtl.abs(e.pageX - this.drag_start_point.get("x"));
+			let move_y = Runtime.rtl.abs(e.pageY - this.drag_start_point.get("y"));
+			if (move_x < 10 && move_y < 10) return false;
+			/* Start drag */
+			this.is_drag = true;
+			this.createShadow();
+			return true;
+		},
+		/**
+		 * Stop drag & drop
+		 */
+		stopDrag: function()
+		{
+			if (!this.is_drag) return;
+			this.is_drag = false;
+			this.is_transition = false;
+			this.drag_elem = null;
+			this.drag_start_point = null;
+			this.shadow_elem.remove();
+			this.shadow_elem = null;
+		},
+		/**
+		 * Move drag & drop
+		 */
+		moveDrag: function(e)
+		{
+			if (!this.is_drag) return;
+			this.moveShadow(e.pageX, e.pageY);
+			if (this.is_transition) return;
+			let elem = this.getDragElementFromPoint(e.pageX, e.pageY);
+			if (!elem) return;
+			let pos = elem.getAttribute("data-pos");
+			if (pos == this.drag_item_pos) return;
+			/* Swap items with animation */
+			this.is_transition = true;
+			this.old_value = this.copyItem(this.value);
+			this.swapItems(this.drag_item_pos, pos);
+			this.drag_item_pos = pos;
+			/* Stop animation */
+			window.setTimeout(() =>
+			{
+				this.is_transition = false;
+			}, this.duration);
+			/* Send value change */
+			this.onValueChange();
+		},
+		/**
+		 * On value change
+		 */
+		onValueChange: function()
+		{
+			this.emit(new Runtime.Widget.Messages.ValueChangeMessage(Runtime.Map.create({
+				"value": this.value,
+				"old_value": this.old_value,
+				"data": this.data,
+			})));
+		},
+		/**
+		 * Add item click
+		 */
+		onAddItemClick: function()
+		{
+			let items = this.getItems();
+			if (items == null)
+			{
+				this.emit(new Runtime.Widget.Messages.ValueChangeMessage(Runtime.Map.create({
+					"value": this.createValue(),
+					"old_value": this.old_value,
+					"data": this.data,
+				})));
+			}
+			this.nextTick(() =>
+			{
+				this.old_value = this.value.slice();
+				let items = this.getItems();
+				items.push(this.createItem());
+				this.onValueChange();
+			});
+		},
+		/**
+		 * Mouse down
+		 */
+		onMouseDown: function(e, item)
+		{
+			if (e.button != 0) return;
+			if (this.is_drag) return;
+			/* Set start drag item */
+			this.drag_elem = this.getDragElement(e.target);
+			this.drag_item = item;
+			this.drag_item_pos = this.drag_elem.getAttribute("data-pos");
+			this.drag_start_point = Runtime.Map.create({
+				"x": e.pageX,
+				"y": e.pageY,
+				"shift_x": e.pageX - e.target.offsetLeft,
+				"shift_y": e.pageY - e.target.offsetTop,
+			});
+			/* Add event listener */
+			document.addEventListener("mouseup", this.onMouseUp);
+			document.addEventListener("mousemove", this.onMouseMove);
+			e.preventDefault();
+			return false;
+		},
+		/**
+		 * Mouse tree up
+		 */
+		onMouseUp: function(e)
+		{
+			/* Remove event listener */
+			document.removeEventListener("mouseup", this.onMouseUp);
+			document.removeEventListener("mousemove", this.onMouseMove);
+			/* Stop drag & drop */
+			this.stopDrag();
+		},
+		/**
+		 * Mouse move
+		 */
+		onMouseMove: function(e)
+		{
+			if (this.drag_elem == null) return;
+			/* Try to start drag & drop */
+			if (!this.is_drag) this.startDrag(e);
+			if (!this.is_drag) return;
+			/* Move Drag & Drop */
+			this.moveDrag(e);
+		},
+		getClassName: function(){ return "Runtime.Widget.Sortable.ItemList"; },
+	},
+	getComponentStyle: function(){ return ".sortable_list.h-3bb3{position: relative}.sortable_list__item.h-3bb3{display: flex;align-items: center;justify-content: flex-start;border-width: var(--border-width);border-color: var(--color-border);border-style: solid;border-radius: 4px;margin: 5px}.sortable_list__item_drag.h-3bb3, .sortable_list__item_remove.h-3bb3{cursor: pointer;padding: 0px 5px}.sortable_list__item_value.h-3bb3{flex: 1}.sortable_list__item_value.h-3bb3 .input, .sortable_list__item_value.h-3bb3 .select{padding: 0px 10px;border-color: transparent;border-radius: 0;border-width: 0}.sortable_list__buttons.h-3bb3{text-align: center;margin-top: var(--space)}.sortable_list__shadow_elem.h-3bb3{position: absolute;opacity: 0.5;user-select: none;z-index: 9999999}.sortable_list__shadow_elem.h-3bb3 .sortable_list__item_drag{cursor: grabbing}.sortable_list__shadow_elem.h-3bb3 .sortable_list__item{margin: 0}.sortable_list-move.h-3bb3, .sortable_list-enter-active.h-3bb3, .sortable_list-leave-active.h-3bb3{transition: all 0.3s ease}.sortable_list-enter-from.h-3bb3, .sortable_list-leave-to.h-3bb3{opacity: 0}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector("Runtime.Widget.Button", "Runtime.Widget.Input", "Runtime.Widget.Select"); },
+};
+window["Runtime.Widget.Sortable.ItemList"] = Runtime.Widget.Sortable.ItemList;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Sortable == 'undefined') Runtime.Widget.Sortable = {};
+Runtime.Widget.Sortable.FieldList = {
+	name: "Runtime.Widget.Sortable.FieldList",
+	extends: Runtime.Widget.Sortable.ItemList,
+	data: function()
+	{
+		return {
+			fields: Runtime.Vector.create([]),
+		};
+	},
+	methods:
+	{
+		renderValueItem: function(field, pos, item)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["sortable_list__item_value_row", componentHash])}));
+			
+			/* Element div */
+			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["sortable_list__item_value_label", componentHash])}));
+			__v1.push(field.get("label"));
+			
+			/* Element div */
+			let __v2 = __v0.element("div", new Runtime.Map({"class": rs.className(["sortable_list__item_value_item", componentHash])}));
+			
+			if (item)
+			{
+				let field_name = field.get("name");
+				let field_component = field.get("component");
+				let field_props = field.get("props");
+				if (!field_props)
+				{
+					field_props = new Runtime.Map();
+				}
+				
+				/* Element field_component */
+				__v2.element(field_component, new Runtime.Map({"name": field_name, "value": this.getValue(field, item), "onValueChange": this.hash(0) ? this.hash(0) : this.hash(0, (event) =>
+				{
+					this.setValue(field, item, event);
+				})}).concat(field_props));
+			}
+			
+			return __v;
+		},
+		renderValue: function(pos, item)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			for (let i = 0; i < this.fields.count(); i++)
+			{
+				let field = this.fields.get(i);
+				__v.push(this.renderValueItem(field, pos, item));
+			}
+			
+			return __v;
+		},
+		renderItem: function(pos)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			let item = this.getItems().get(pos);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["sortable_list__item", componentHash]), "data-pos": pos, "key": item}));
+			
+			/* Element div */
+			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["sortable_list__item_element sortable_list__item_element--drag", componentHash])}));
+			
+			/* Element div */
+			let __v2 = __v1.element("div", new Runtime.Map({"class": rs.className(["sortable_list__item_drag", componentHash]), "onMousedown": this.hash(1) ? this.hash(1) : this.hash(1, (e) =>
+			{
+				this.onMouseDown(e, item);
+			})}));
+			__v2.push("☰");
+			
+			/* Element div */
+			let __v3 = __v0.element("div", new Runtime.Map({"class": rs.className(["sortable_list__item_value", componentHash])}));
+			__v3.push(this.renderValue(pos, item));
+			
+			/* Element div */
+			let __v4 = __v0.element("div", new Runtime.Map({"class": rs.className(["sortable_list__item_element sortable_list__item_element--remove", componentHash])}));
+			
+			/* Element div */
+			let __v5 = __v4.element("div", new Runtime.Map({"class": rs.className(["sortable_list__item_remove", componentHash]), "onClick": this.hash(2) ? this.hash(2) : this.hash(2, (e) =>
+			{
+				this.removeItem(pos);
+			})}));
+			__v5.push("✕");
+			
+			return __v;
+		},
+		/**
+		 * Create new item
+		 */
+		createItem: function(){ return new Runtime.Map(); },
+		/**
+		 * Returns value
+		 */
+		getValue: function(field, item)
+		{
+			if (field.has("value"))
+			{
+				let value = field.get("value");
+				return value(item);
+			}
+			let field_name = field.get("name");
+			return item.get(field_name);
+		},
+		/**
+		 * Set value
+		 */
+		setValue: function(field, item, message)
+		{
+			if (field.has("setValue"))
+			{
+				let setValue = field.get("setValue");
+				setValue(item, message.value);
+			}
+			else
+			{
+				let field_name = field.get("name");
+				item.set(field_name, message.value);
+			}
+			this.onValueChange();
+		},
+		/**
+		 * Returns drag & drop element
+		 */
+		getDragElement: function(elem)
+		{
+			if (elem.classList.contains("sortable_list__item")) return elem;
+			if (elem.parentElement.classList.contains("sortable_list__item"))
+			{
+				return elem.parentElement;
+			}
+			if (elem.parentElement.parentElement.classList.contains("sortable_list__item"))
+			{
+				return elem.parentElement.parentElement;
+			}
+			return null;
+		},
+		getClassName: function(){ return "Runtime.Widget.Sortable.FieldList"; },
+	},
+	getComponentStyle: function(){ return ".sortable_list__item.h-a648{align-items: stretch;margin: 10px 0px}.sortable_list__item_element.h-a648{display: flex}.sortable_list__item_element--drag.h-a648{align-items: center}.sortable_list__item_element--remove.h-a648{align-items: start}.sortable_list__item_value.h-a648{padding: 5px}.sortable_list__item_value_row.h-a648{display: flex;align-items: center;margin-bottom: 1px}.sortable_list__item_value_label.h-a648{width: 80px}.sortable_list__item_value_item.h-a648{flex: 1}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector("Runtime.Widget.Input", "Runtime.Widget.Select"); },
+};
+window["Runtime.Widget.Sortable.FieldList"] = Runtime.Widget.Sortable.FieldList;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Tab == 'undefined') Runtime.Widget.Tab = {};
+Runtime.Widget.Tab.Tab = {
+	name: "Runtime.Widget.Tab.Tab",
+	extends: Runtime.Component,
+	props: {
+		name: {default: ""},
+		title: {default: ""},
+		href: {default: ""},
+	},
+	methods:
+	{
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			let model = this.getParent().model;
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["tabs__item", model.isActive(this.name) ? "tabs__item--active" : "", componentHash]), "data-tab": this.name}));
+			
+			if (this.canShow)
+			{
+				__v0.push(this.renderSlot("default"));
+			}
+			
+			return __v;
+		},
+		getClassName: function(){ return "Runtime.Widget.Tab.Tab"; },
+	},
+	computed:
+	{
+		/**
+		 * Returns true if tab can show
+		 */
+		canShow: function()
+		{
+			if (this.href == "") return true;
+			let model = this.getParent().model;
+			if (model.isActive(this.name)) return true;
+			return false;
+		},
+	},
+	getComponentStyle: function(){ return ".tabs__item.h-8789{position: relative;display: none}.tabs__item--active.h-8789{display: block}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector(); },
+};
+window["Runtime.Widget.Tab.Tab"] = Runtime.Widget.Tab.Tab;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Tab == 'undefined') Runtime.Widget.Tab = {};
+Runtime.Widget.Tab.TabMessage = class extends Runtime.Message
+{
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.name = "tab";
+		this.key = "";
+	}
+	static getClassName(){ return "Runtime.Widget.Tab.TabMessage"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Tab.TabMessage"] = Runtime.Widget.Tab.TabMessage;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Tab == 'undefined') Runtime.Widget.Tab = {};
+Runtime.Widget.Tab.Tabs = {
+	name: "Runtime.Widget.Tab.Tabs",
+	extends: Runtime.Component,
+	methods:
+	{
+		renderHeader: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["tabs__header", componentHash])}));
+			
+			let items = this.items;
+			for (let i = 0; i < items.count(); i++)
+			{
+				let tab = items.get(i);
+				let tab_name = tab.get("name");
+				let tab_title = tab.get("title");
+				let tab_href = tab.get("href");
+				let is_active = this.model.isActive(tab_name);
+				if (tab_href == null)
+				{
+					/* Element div */
+					let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["tabs__header_item", is_active ? "tabs__header_item--active" : "", componentHash]), "data-tab": tab_name, "onClick": this.hash(0) ? this.hash(0) : this.hash(0, (event) =>
+					{
+						this.onClick(tab_name);
+					})}));
+					__v1.push(tab_title);
+				}
+				else
+				{
+					/* Element a */
+					let __v2 = __v0.element("a", new Runtime.Map({"class": rs.className(["tabs__header_item", is_active ? "tabs__header_item--active" : "", componentHash]), "data-tab": tab_name, "href": tab_href}));
+					__v2.push(tab_title);
+				}
+			}
+			
+			return __v;
+		},
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["tabs", this.class, componentHash])}));
+			__v0.push(this.renderHeader());
+			
+			/* Element div */
+			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["tabs__content", componentHash])}));
+			__v1.push(this.renderSlot("default"));
+			
+			return __v;
+		},
+		/**
+		 * OnClick
+		 */
+		onClick: function(tab_key)
+		{
+			this.model.setActive(tab_key);
+			this.emit(new Runtime.Widget.Tab.TabMessage(Runtime.Map.create({
+				"key": tab_key,
+			})));
+		},
+		getClassName: function(){ return "Runtime.Widget.Tab.Tabs"; },
+	},
+	computed:
+	{
+		/**
+		 * Returns items
+		 */
+		items: function()
+		{
+			let result = Runtime.Vector.create([]);
+			let items = Runtime.Vector.create([]);
+			let vdom = this.renderSlot("default");
+			if (vdom instanceof Runtime.VirtualDom) items = vdom.items;
+			else
+			{
+				items = Runtime.Vector.create(vdom);
+			}
+			for (let i = 0; i < items.count(); i++)
+			{
+				let item = items.get(i);
+				if (item instanceof Runtime.VirtualDom)
+				{
+					result.push(Runtime.Map.create({
+						"name": item.attrs.get("name"),
+						"title": item.attrs.get("title"),
+						"href": item.attrs.get("href"),
+					}));
+				}
+				else
+				{
+					result.push(Runtime.Map.create({
+						"name": item.props.name,
+						"title": item.props.title,
+						"href": item.props.href,
+					}));
+				}
+			}
+			return result;
+		},
+	},
+	getComponentStyle: function(){ return ".tabs.h-209{position: relative}.tabs__header.h-209{display: flex;position: relative;border-bottom-width: var(--border-width);border-bottom-color: var(--color-border);border-bottom-style: solid;transition: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.tabs__header_item.h-209{position: relative;padding: calc(1.5 * var(--space));border-color: transparent;border-width: var(--border-width);border-style: solid;border-bottom-width: 0px;transition: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type);text-decoration: none;color: inherit;cursor: pointer;-webkit-user-select: none;-moz-user-select: none;-khtml-user-select: none;-ms-user-select: none;top: var(--border-width)}.tabs__header_item.h-209:hover, .tabs__header_item.h-209:visited, .tabs__header_item.h-209:visited:hover, .tabs__header_item.h-209:focus{text-decoration: none;color: inherit;box-shadow: none;outline: transparent}.tabs__header_item--active.h-209{background-color: var(--color-background);border-color: var(--color-border)}.tabs__content.h-209{margin-top: calc(2 * var(--space))}.tabs__item.h-209{position: relative;display: none}.tabs__item--active.h-209{display: block}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector("Runtime.Widget.Tab.Tab"); },
+};
+window["Runtime.Widget.Tab.Tabs"] = Runtime.Widget.Tab.Tabs;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Tab == 'undefined') Runtime.Widget.Tab = {};
+Runtime.Widget.Tab.TabsModel = class extends Runtime.BaseModel
+{
+	/**
+	 * Init widget params
+	 */
+	initParams(params)
+	{
+		super.initParams(params);
+		if (params == null) return;
+		if (params.has("active")) this.active = params.get("active");
+		if (params.has("render")) this.render = params.get("render");
+	}
+	
+	
+	/**
+	 * Returns true if active
+	 */
+	isActive(name){ return this.active == name; }
+	
+	
+	/**
+	 * Set active
+	 */
+	setActive(active)
+	{
+		this.active = active;
+	}
+	
+	
+	/**
+	 * Can show
+	 */
+	canShow(tab_key)
+	{
+		let tab = this.items.findItem(Runtime.lib.equalAttr("key", tab_key));
+		if (tab == null) return false;
+		if (tab.has("href") && tab.get("key") != tab_key) return false;
+		return true;
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.active = "";
+		this.render = true;
+		this.component = "Runtime.Widget.Tab.Tabs";
+	}
+	static getClassName(){ return "Runtime.Widget.Tab.TabsModel"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Tab.TabsModel"] = Runtime.Widget.Tab.TabsModel;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Table == 'undefined') Runtime.Widget.Table = {};
+Runtime.Widget.Table.Manager = class extends Runtime.BaseModel
+{
+	/**
+	 * Serialize object
+	 */
+	static serialize(rules)
+	{
+		super.serialize(rules);
+		rules.addType("form", new Runtime.Serializer.ObjectType(Runtime.Map.create({
+			"autocreate": true,
+			"extends": "Runtime.Widget.Form.FormModel",
+			"pk_type": rules.params ? rules.params.get("pk_type") : null,
+			"item_type": rules.params ? rules.params.get("item_type") : null,
+		})));
+		rules.addType("table", new Runtime.Serializer.ObjectType(Runtime.Map.create({
+			"autocreate": true,
+			"extends": "Runtime.Widget.Table.TableModel",
+			"item_type": rules.params ? rules.params.get("item_type") : null,
+		})));
+		rules.addType("dialog", new Runtime.Serializer.ObjectType(Runtime.Map.create({"extends": "Runtime.Widget.Dialog.DialogModel"})));
+	}
+	
+	
+	/**
+	 * Init params
+	 */
+	initParams(params)
+	{
+		super.initParams(params);
+		if (params.has("api_name")) this.api_name = params.get("api_name");
+		if (params.has("foreign_key")) this.foreign_key = params.get("foreign_key");
+		if (params.has("page_name")) this.page_name = params.get("page_name");
+		if (params.has("title")) this.title = params.get("title");
+	}
+	
+	
+	/**
+	 * Init widget
+	 */
+	initWidget(params)
+	{
+		super.initWidget(params);
+		if (params.has("dialog")) this.dialog = params.get("dialog");
+		else this.dialog = this.createWidget("Runtime.Widget.Dialog.DialogModel");
+		this.dialog.addEventListener("hide", new Runtime.Method(this, "onDialogHide"));
+		if (params.has("form")) this.form = params.get("form");
+		else this.form = this.createWidget("Runtime.Widget.Form.FormModel");
+		if (params.has("table")) this.table = params.get("table");
+		else this.table = this.createWidget("Runtime.Widget.Table.TableModel");
+		if (params.has("loader")) this.loader = params.get("loader");
+		else this.loader = this.createWidget("Runtime.Widget.Table.TableLoader", Runtime.Map.create({
+			"api_name": this.api_name,
+			"foreign_key": this.foreign_key,
+			"page_name": this.page_name,
+			"table": this.table,
+		}));
+	}
+	
+	
+	/**
+	 * Load data
+	 */
+	async loadData(container)
+	{
+		await this.loader.loadData(container);
+	}
+	
+	
+	/**
+	 * Set foreign key
+	 */
+	setForeignKey(key)
+	{
+		this.foreign_key = key;
+		this.loader.foreign_key = key;
+	}
+	
+	
+	/**
+	 * Returns dialog action
+	 */
+	getDialogAction()
+	{
+		if (this.dialog_action == "save")
+		{
+			if (this.form.pk) return "edit";
+			else return "add";
+		}
+		return this.dialog_action;
+	}
+	
+	
+	/**
+	 * Returns dialog title
+	 */
+	getDialogTitle(action)
+	{
+		if (this.title) return Runtime.rtl.apply(this.title, Runtime.Vector.create([action, this.form.item]));
+		return "";
+	}
+	
+	
+	/**
+	 * Show add dialog
+	 */
+	showAddDialog()
+	{
+		this.dialog_action = "save";
+		this.form.clear();
+		this.dialog.show();
+	}
+	
+	
+	/**
+	 * Show edit dialog
+	 */
+	showEditDialog(item)
+	{
+		this.dialog_action = "save";
+		this.form.clear();
+		this.form.setPrimaryKey(item);
+		this.form.setItem(item);
+		this.dialog.show();
+	}
+	
+	
+	/**
+	 * Show delete dialog
+	 */
+	showDeleteDialog(item)
+	{
+		this.dialog_action = "delete";
+		this.form.clear();
+		this.form.setPrimaryKey(item);
+		this.form.setItem(item);
+		this.dialog.show();
+	}
+	
+	
+	/**
+	 * On hide dialog
+	 */
+	onDialogHide()
+	{
+		this.dialog_action = "";
+	}
+	
+	
+	/**
+	 * On save
+	 */
+	async onSave()
+	{
+		this.form.setWaitMessage();
+		let result = await this.layout.sendApi(Runtime.Map.create({
+			"api_name": this.api_name,
+			"method_name": "save",
+			"data": Runtime.Map.create({
+				"pk": this.form.pk,
+				"item": this.form.item,
+				"foreign_key": this.foreign_key,
+			}),
+		}));
+		this.form.setApiResult(result);
+		if (result.isSuccess())
+		{
+			this.loader.reload();
+			this.dialog.hide();
+		}
+	}
+	
+	
+	/**
+	 * On delete
+	 */
+	async onDelete()
+	{
+		this.form.setWaitMessage();
+		let result = await this.layout.sendApi(Runtime.Map.create({
+			"api_name": this.api_name,
+			"method_name": "delete",
+			"data": Runtime.Map.create({
+				"pk": this.form.pk,
+				"foreign_key": this.foreign_key,
+			}),
+		}));
+		this.form.setApiResult(result);
+		if (result.isSuccess())
+		{
+			this.loader.reload();
+			this.dialog.hide();
+		}
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.form = null;
+		this.table = null;
+		this.api_name = "";
+		this.page_name = "page";
+		this.foreign_key = null;
+		this.dialog_action = "";
+		this.dialog = null;
+		this.loader = null;
+		this.title = null;
+	}
+	static getClassName(){ return "Runtime.Widget.Table.Manager"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Table.Manager"] = Runtime.Widget.Table.Manager;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Table == 'undefined') Runtime.Widget.Table = {};
+Runtime.Widget.Table.Table = {
+	name: "Runtime.Widget.Table.Table",
+	extends: Runtime.Component,
+	methods:
+	{
+		renderHeader: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			__v.push(this.renderSlot("header"));
+			
+			return __v;
+		},
+		renderRow: function(item, row_number)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			__v.push(this.renderSlot("row", Runtime.Vector.create([item, row_number])));
+			
+			return __v;
+		},
+		renderTable: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element table */
+			let __v0 = __v.element("table");
+			
+			/* Element tbody */
+			let __v1 = __v0.element("tbody");
+			
+			/* Element tr */
+			let __v2 = __v1.element("tr", new Runtime.Map({"class": rs.className(["table__header", componentHash])}));
+			__v2.push(this.renderHeader());
+			
+			if (this.model.items)
+			{
+				for (let i = 0; i < this.model.items.count(); i++)
+				{
+					let item = this.model.items.get(i);
+					
+					/* Element tr */
+					let __v3 = __v1.element("tr", new Runtime.Map({"class": rs.className(["table__row", componentHash])}));
+					__v3.push(this.renderRow(item, i));
+				}
+			}
+			
+			return __v;
+		},
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["table", componentHash])}));
+			__v0.push(this.renderTable());
+			
+			return __v;
+		},
+		getClassName: function(){ return "Runtime.Widget.Table.Table"; },
+	},
+	getComponentStyle: function(){ return ".table.h-6433 table{border-collapse: collapse;background-color: var(--color-background);border: 1px var(--color-border) solid}.table.h-6433 th, .table.h-6433 td{padding: var(--space);border-bottom: 1px var(--color-border) solid}.table.h-6433 th{font-weight: bold}.table__row.h-6433:nth-child(even){background-color: var(--color-surface)}.table__row.h-6433:last-child{border-bottom-width: 0px}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector(); },
+};
+window["Runtime.Widget.Table.Table"] = Runtime.Widget.Table.Table;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Table == 'undefined') Runtime.Widget.Table = {};
+Runtime.Widget.Table.TableDialog = {
+	name: "Runtime.Widget.Table.TableDialog",
+	extends: Runtime.Widget.Dialog.Dialog,
+	props: {
+		manager: {default: null},
+	},
+	methods:
+	{
+		renderTitle: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			let action = this.manager.getDialogAction();
+			__v.push(this.manager.getDialogTitle(action));
+			
+			return __v;
+		},
+		renderContent: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["dialog__content", componentHash])}));
+			
+			if (this.manager.dialog_action == "save")
+			{
+				__v0.push(this.renderSlot("save"));
+			}
+			else if (this.manager.dialog_action == "delete")
+			{
+				/* Element div */
+				let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["dialog__delete_message", componentHash])}));
+				__v1.push(this.manager.getDialogTitle("delete_message"));
+				__v0.push(this.renderWidget(this.manager.form.result, Runtime.Map.create({
+					"class": "result--center",
+				})));
+			}
+			
+			return __v;
+		},
+		renderFooter: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["dialog__footer", componentHash])}));
+			
+			let action = this.manager.getDialogAction();
+			if (action == "add")
+			{
+				/* Element Runtime.Widget.Button */
+				let __v1 = __v0.element("Runtime.Widget.Button", new Runtime.Map({"onClick": this.hash(0) ? this.hash(0) : this.hash(0, (event) =>
+				{
+					this.manager.dialog.hide();
+				})}));
+				
+				/* Content */
+				__v1.slot("default", () =>
+				{
+					const rs = use("Runtime.rs");
+					const componentHash = rs.getComponentHash(this.getClassName());
+					let __v = new Runtime.VirtualDom(this);
+					__v.push("Cancel");
+					return __v;
+				});
+				
+				/* Element Runtime.Widget.Button */
+				let __v2 = __v0.element("Runtime.Widget.Button", new Runtime.Map({"onClick": this.hash(1) ? this.hash(1) : this.hash(1, (event) =>
+				{
+					this.manager.onSave();
+				}), "class": rs.className(["button--primary", componentHash])}));
+				
+				/* Content */
+				__v2.slot("default", () =>
+				{
+					const rs = use("Runtime.rs");
+					const componentHash = rs.getComponentHash(this.getClassName());
+					let __v = new Runtime.VirtualDom(this);
+					__v.push("Create");
+					return __v;
+				});
+			}
+			else if (action == "edit")
+			{
+				/* Element Runtime.Widget.Button */
+				let __v3 = __v0.element("Runtime.Widget.Button", new Runtime.Map({"onClick": this.hash(2) ? this.hash(2) : this.hash(2, (event) =>
+				{
+					this.manager.dialog.hide();
+				})}));
+				
+				/* Content */
+				__v3.slot("default", () =>
+				{
+					const rs = use("Runtime.rs");
+					const componentHash = rs.getComponentHash(this.getClassName());
+					let __v = new Runtime.VirtualDom(this);
+					__v.push("Cancel");
+					return __v;
+				});
+				
+				/* Element Runtime.Widget.Button */
+				let __v4 = __v0.element("Runtime.Widget.Button", new Runtime.Map({"onClick": this.hash(3) ? this.hash(3) : this.hash(3, (event) =>
+				{
+					this.manager.onSave();
+				}), "class": rs.className(["button--primary", componentHash])}));
+				
+				/* Content */
+				__v4.slot("default", () =>
+				{
+					const rs = use("Runtime.rs");
+					const componentHash = rs.getComponentHash(this.getClassName());
+					let __v = new Runtime.VirtualDom(this);
+					__v.push("Save");
+					return __v;
+				});
+			}
+			else if (action == "delete")
+			{
+				/* Element Runtime.Widget.Button */
+				let __v5 = __v0.element("Runtime.Widget.Button", new Runtime.Map({"onClick": this.hash(4) ? this.hash(4) : this.hash(4, (event) =>
+				{
+					this.manager.dialog.hide();
+				})}));
+				
+				/* Content */
+				__v5.slot("default", () =>
+				{
+					const rs = use("Runtime.rs");
+					const componentHash = rs.getComponentHash(this.getClassName());
+					let __v = new Runtime.VirtualDom(this);
+					__v.push("Cancel");
+					return __v;
+				});
+				
+				/* Element Runtime.Widget.Button */
+				let __v6 = __v0.element("Runtime.Widget.Button", new Runtime.Map({"onClick": this.hash(5) ? this.hash(5) : this.hash(5, (event) =>
+				{
+					this.manager.onDelete();
+				}), "class": rs.className(["button--danger", componentHash])}));
+				
+				/* Content */
+				__v6.slot("default", () =>
+				{
+					const rs = use("Runtime.rs");
+					const componentHash = rs.getComponentHash(this.getClassName());
+					let __v = new Runtime.VirtualDom(this);
+					__v.push("Delete");
+					return __v;
+				});
+			}
+			
+			return __v;
+		},
+		getClassName: function(){ return "Runtime.Widget.Table.TableDialog"; },
+	},
+	getComponentStyle: function(){ return ""; },
+	getRequiredComponents: function(){ return new Runtime.Vector("Runtime.Widget.Button"); },
+};
+window["Runtime.Widget.Table.TableDialog"] = Runtime.Widget.Table.TableDialog;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Table == 'undefined') Runtime.Widget.Table = {};
+Runtime.Widget.Table.TableLoader = class extends Runtime.BaseModel
+{
+	/**
+	 * Init params
+	 */
+	initParams(params)
+	{
+		super.initParams(params);
+		if (params.has("table")) this.table = params.get("table");
+		if (params.has("foreign_key")) this.foreign_key = params.get("foreign_key");
+		if (params.has("api_name")) this.api_name = params.get("api_name");
+		if (params.has("method_name")) this.method_name = params.get("method_name");
+		if (params.has("page_name")) this.page_name = params.get("page_name");
+		if (params.has("page")) this.page = params.get("page");
+		if (params.has("limit")) this.limit = params.get("limit");
+	}
+	
+	
+	/**
+	 * Load data
+	 */
+	async loadData(container)
+	{
+		let page = container.request.query.get(this.page_name, 1);
+		this.page = page - 1;
+		return await this.reload();
+	}
+	
+	
+	/**
+	 * Reload
+	 */
+	async reload()
+	{
+		let api_result = await this.layout.sendApi(Runtime.Map.create({
+			"api_name": this.api_name,
+			"method_name": this.method_name,
+			"data": Runtime.Map.create({
+				"page": this.page,
+				"limit": this.limit,
+				"foreign_key": this.foreign_key,
+			}),
+		}));
+		if (api_result.isSuccess() && api_result.data.has("items"))
+		{
+			this.table.setItems(api_result.data.get("items"));
+		}
+		return api_result;
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.table = null;
+		this.foreign_key = null;
+		this.api_name = "";
+		this.method_name = "search";
+		this.page_name = "page";
+		this.page = 0;
+		this.limit = 10;
+	}
+	static getClassName(){ return "Runtime.Widget.Table.TableLoader"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Table.TableLoader"] = Runtime.Widget.Table.TableLoader;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Table == 'undefined') Runtime.Widget.Table = {};
+Runtime.Widget.Table.TableModel = class extends Runtime.BaseModel
+{
+	/**
+	 * Serialize object
+	 */
+	static serialize(rules)
+	{
+		super.serialize(rules);
+		rules.addType("items", new Runtime.Serializer.VectorType(rules.params ? rules.params.get("item_type") : null));
+		rules.setup.add((model, rules) =>
+		{
+			model.item_type = rules.params ? rules.params.get("item_type") : null;
+		});
+	}
+	
+	
+	/**
+	 * Assign rules
+	 */
+	assignRules(rules)
+	{
+		super.assignRules(rules);
+		this.item_type = rules.params.get("item_type");
+	}
+	
+	
+	/**
+	 * Init params
+	 */
+	initParams(params)
+	{
+		super.initParams(params);
+	}
+	
+	
+	/**
+	 * Set items
+	 */
+	setItems(items)
+	{
+		let vector = new Runtime.Serializer.VectorType(this.item_type);
+		this.items = vector.filter(items, Runtime.Vector.create([]));
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.component = "Runtime.Widget.Table.Table";
+		this.items = Runtime.Vector.create([]);
+		this.item_type = null;
+	}
+	static getClassName(){ return "Runtime.Widget.Table.TableModel"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Table.TableModel"] = Runtime.Widget.Table.TableModel;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Table == 'undefined') Runtime.Widget.Table = {};
+Runtime.Widget.Table.TableWrap = {
+	name: "Runtime.Widget.Table.TableWrap",
+	extends: Runtime.Component,
+	props: {
+		table_fields: {default: Runtime.Vector.create([])},
+		form_fields: {default: Runtime.Vector.create([])},
+		dialog: {default: "true"},
+	},
+	methods:
+	{
+		renderTopButtons: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			if (this.slot("top_buttons"))
+			{
+				__v.push(this.renderSlot("top_buttons"));
+			}
+			
+			return __v;
+		},
+		renderDialog: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			if (this.dialog == "true")
+			{
+				/* Element Runtime.Widget.Table.TableDialog */
+				let __v0 = __v.element("Runtime.Widget.Table.TableDialog", new Runtime.Map({"model": this.model.dialog, "manager": this.model}));
+				
+				/* Slot save */
+				__v0.slot("save", () =>
+				{
+					const rs = use("Runtime.rs");
+					const componentHash = rs.getComponentHash(this.getClassName());
+					let __v = new Runtime.VirtualDom(this);
+					
+					/* Element Runtime.Widget.Form.Form */
+					__v.element("Runtime.Widget.Form.Form", new Runtime.Map({"fields": this.form_fields, "model": this.model.form}));
+					
+					return __v;
+				});
+			}
+			
+			return __v;
+		},
+		renderTableValue: function(item, field, row_number)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			let field_name = field.get("name");
+			if (field_name == "row_number")
+			{
+				__v.push(row_number + this.row_offset + 1);
+			}
+			else if (field.has("slot"))
+			{
+				__v.push(this.renderSlot(field.get("slot"), Runtime.Vector.create([item, field, row_number])));
+			}
+			else if (field.has("value"))
+			{
+				__v.push(Runtime.rtl.apply(field.get("value"), Runtime.Vector.create([item, field, row_number])));
+			}
+			else
+			{
+				__v.push(item.get(field_name));
+			}
+			
+			return __v;
+		},
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["table_wrap", componentHash])}));
+			__v0.push(this.renderTopButtons());
+			
+			/* Element Runtime.Widget.Table.Table */
+			let __v1 = __v0.element("Runtime.Widget.Table.Table", new Runtime.Map({"model": this.model.table}));
+			
+			/* Slot header */
+			__v1.slot("header", () =>
+			{
+				const rs = use("Runtime.rs");
+				const componentHash = rs.getComponentHash(this.getClassName());
+				let __v = new Runtime.VirtualDom(this);
+				
+				for (let i = 0; i < this.table_fields.count(); i++)
+				{
+					let field = this.table_fields.get(i);
+					
+					/* Element th */
+					let __v0 = __v.element("th");
+					__v0.push(field.get("label"));
+				}
+				
+				return __v;
+			});
+			
+			/* Slot row */
+			__v1.slot("row", (item, row_number) =>
+			{
+				const rs = use("Runtime.rs");
+				const componentHash = rs.getComponentHash(this.getClassName());
+				let __v = new Runtime.VirtualDom(this);
+				
+				for (let i = 0; i < this.table_fields.count(); i++)
+				{
+					let field = this.table_fields.get(i);
+					
+					/* Element td */
+					let __v0 = __v.element("td");
+					__v0.push(this.renderTableValue(item, field, row_number));
+				}
+				
+				return __v;
+			});
+			__v0.push(this.renderDialog());
+			
+			return __v;
+		},
+		getClassName: function(){ return "Runtime.Widget.Table.TableWrap"; },
+	},
+	computed:
+	{
+		/**
+		 * Returns offset
+		 */
+		row_offset: function()
+		{
+			if (!this.model.loader) return 0;
+			return this.model.loader.page * this.model.loader.limit;
+		},
+	},
+	getComponentStyle: function(){ return ".table_wrap.h-714c > .row_buttons{margin-bottom: calc(var(--space) * 2)}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector("Runtime.Widget.Form.Form", "Runtime.Widget.Form.FormRow", "Runtime.Widget.Table.Table", "Runtime.Widget.Table.TableDialog"); },
+};
+window["Runtime.Widget.Table.TableWrap"] = Runtime.Widget.Table.TableWrap;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Tree == 'undefined') Runtime.Widget.Tree = {};
+Runtime.Widget.Tree.TreeItem = class extends Runtime.BaseObject
+{
+	/**
+	 * Serialize object
+	 */
+	static serialize(rules)
+	{
+		super.serialize(rules);
+		rules.addType("key", new Runtime.Serializer.StringType());
+		rules.addType("label", new Runtime.Serializer.StringType());
+		rules.addType("items", new Runtime.Serializer.VectorType(new Runtime.Serializer.ObjectType(Runtime.Map.create({
+			"autocreate": true,
+			"extends": "Runtime.Widget.Tree.TreeItem",
+		}))));
+	}
+	
+	
+	/**
+	 * Assign rules
+	 */
+	assignRules(rules)
+	{
+	}
+	
+	
+	/**
+	 * Constructor
+	 */
+	constructor(params)
+	{
+		if (params == undefined) params = null;
+		super();
+		this._assign_values(params);
+	}
+	
+	
+	/**
+	 * Returns true if can insert inside
+	 */
+	canDragInside(){ return true; }
+	
+	
+	/**
+	 * Get item
+	 */
+	get(path)
+	{
+		if (path == null) return null;
+		if (path.count() == 0) return this;
+		let pos = path.first();
+		let new_item = this.items.get(pos);
+		if (new_item == null) return null;
+		return new_item.get(path.slice(1));
+	}
+	
+	
+	/**
+	 * Find item position
+	 */
+	find(item){ return item ? this.items.find(Runtime.lib.equal(item)) : -1; }
+	
+	
+	/**
+	 * Context menu click
+	 */
+	onContextMenu(model)
+	{
+	}
+	
+	
+	/**
+	 * Click
+	 */
+	onClick(model)
+	{
+	}
+	
+	
+	/**
+	 * Select item
+	 */
+	onSelect(model)
+	{
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.key = "";
+		this.label = "";
+		this.open = false;
+		this.items = Runtime.Vector.create([]);
+	}
+	static getClassName(){ return "Runtime.Widget.Tree.TreeItem"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return ["Runtime.SerializeInterface"]; }
+};
+window["Runtime.Widget.Tree.TreeItem"] = Runtime.Widget.Tree.TreeItem;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Tree == 'undefined') Runtime.Widget.Tree = {};
+Runtime.Widget.Tree.TreeMessage = class extends Runtime.Message
+{
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+	}
+	static getClassName(){ return "Runtime.Widget.Tree.TreeMessage"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Tree.TreeMessage"] = Runtime.Widget.Tree.TreeMessage;
+"use strict;"
+/*!
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Tree == 'undefined') Runtime.Widget.Tree = {};
+Runtime.Widget.Tree.TreeModel = class extends Runtime.BaseModel
+{
+	/**
+	 * Serialize object
+	 */
+	static serialize(rules)
+	{
+		super.serialize(rules);
+		rules.addType("root", new Runtime.Serializer.ObjectType(Runtime.Map.create({
+			"autocreate": true,
+			"extends": "Runtime.Widget.Tree.TreeItem",
+		})));
+	}
+	
+	
+	/**
+	 * Init widget params
+	 */
+	initParams(params)
+	{
+		super.initParams(params);
+		if (params == null) return;
+		if (params.has("autoselect")) this.autoselect = params.get("autoselect");
+		if (params.has("dnd")) this.dnd = params.get("dnd");
+		if (params.has("icons")) this.icons = params.get("icons");
+	}
+	
+	
+	/**
+	 * Init widget settings
+	 */
+	initWidget(params)
+	{
+		super.initWidget(params);
+		/* Setup context menu */
+		if (params.has("context_menu"))
+		{
+			this.setContextMenu(params.get("context_menu"));
+			if (params.has("context_menu_render"))
+			{
+				this.context_menu_render = params.get("context_menu_render");
+			}
+		}
+	}
+	
+	
+	/**
+	 * Set context menu
+	 */
+	setContextMenu(context_menu)
+	{
+		if (context_menu instanceof Runtime.Widget.ContextMenu.ContextMenuModel)
+		{
+			this.context_menu_render = false;
+			this.context_menu = context_menu;
+		}
+		else if (context_menu instanceof Runtime.Map)
+		{
+			this.context_menu_render = true;
+			this.context_menu = this.createWidget("Runtime.Widget.ContextMenu.ContextMenuModel", context_menu);
+		}
+	}
+	
+	
+	/**
+	 * Select item
+	 */
+	selectItem(path)
+	{
+		let item = path ? this.root.get(path) : null;
+		if (this.selected_item == item) return;
+		this.selected_path = path;
+		this.selected_item = item;
+		if (this.selected_item)
+		{
+			this.selected_item.onSelect();
+		}
+	}
+	
+	
+	/**
+	 * Can drag & drop
+	 */
+	canDrag(src, dest, kind)
+	{
+		let message = new Runtime.Widget.Tree.TreeMessage(Runtime.Map.create({
+			"name": "canDrag",
+			"src": src,
+			"dest": dest,
+			"src_item": this.root.get(src),
+			"dest_item": this.root.get(dest),
+			"kind": kind,
+			"result": true,
+		}));
+		this.emit(message);
+		return message.result;
+	}
+	
+	
+	/**
+	 * Drag & Drop
+	 */
+	dragElement(src, dest, kind)
+	{
+		if (dest.count() == 0) dest = Runtime.Vector.create([this.root.items.count() - 1]);
+		if (!this.canDrag(src, dest, kind)) return;
+		/* Move item */
+		let src_item = this.root.get(src);
+		let dest_item = this.root.get(dest);
+		if (!src_item) return;
+		if (!dest_item) return;
+		/* Get parent items */
+		let src_parent_path = src.slice(0, -1);
+		let dest_parent_path = kind != "into" ? dest.slice(0, -1) : dest;
+		let src_parent_item = this.root.get(src_parent_path);
+		let dest_parent_item = this.root.get(dest_parent_path);
+		/* Move item */
+		src_parent_item.items.removeItem(src_item);
+		if (kind == "into") dest_parent_item.items.addItem(src_item, null, "before");
+		else dest_parent_item.items.addItem(src_item, dest_item, kind);
+		/* Update dest path */
+		let new_dest_parent_path = dest_parent_path.slice();
+		if (src.count() <= new_dest_parent_path.count())
+		{
+			let pos = src.count() - 1;
+			if (src.get(pos) < new_dest_parent_path.get(pos))
+			{
+				new_dest_parent_path.set(pos, new_dest_parent_path.get(pos) - 1);
+			}
+		}
+		/* Create src new path */
+		let pos = dest_parent_item.find(src_item);
+		let new_src_path = new_dest_parent_path.pushIm(pos);
+		/* Send drag & drop event */
+		this.emit(new Runtime.Widget.Tree.TreeMessage(Runtime.Map.create({
+			"name": "dragElement",
+			"dest_item": dest_item,
+			"dest_parent_item": dest_parent_item,
+			"kind": kind,
+			"src_item": src_item,
+			"src_parent_item": src_parent_item,
+			"new_src_path": new_src_path,
+		})));
+	}
+	
+	
+	/* ========= Class init functions ========= */
+	_init()
+	{
+		super._init();
+		this.component = "Runtime.Widget.Tree.TreeWidget";
+		this.autoselect = true;
+		this.dnd = false;
+		this.icons = true;
+		this.is_open = false;
+		this.context_menu_render = true;
+		this.context_menu = null;
+		this.selected_path = null;
+		this.selected_item = null;
+		this.root = null;
+	}
+	static getClassName(){ return "Runtime.Widget.Tree.TreeModel"; }
+	static getMethodsList(){ return null; }
+	static getMethodInfoByName(field_name){ return null; }
+	static getInterfaces(){ return []; }
+};
+window["Runtime.Widget.Tree.TreeModel"] = Runtime.Widget.Tree.TreeModel;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+if (typeof Runtime.Widget.Tree == 'undefined') Runtime.Widget.Tree = {};
+Runtime.Widget.Tree.TreeWidget = {
+	name: "Runtime.Widget.Tree.TreeWidget",
+	extends: Runtime.Component,
+	data: function()
+	{
+		return {
+			dnd: null,
+		};
+	},
+	methods:
+	{
+		renderBox: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			if (this.dnd && this.drag_dest_box != null && this.is_drag)
+			{
+				/* Element div */
+				__v.element("div", new Runtime.Map({"class": rs.className(["tree_widget__box", "tree_widget__box--" + String(this.drag_dest_kind), componentHash]), "style": this.drag_dest_box}));
+			}
+			
+			return __v;
+		},
+		renderItemLabel: function(item, path)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element span */
+			let __v0 = __v.element("span", new Runtime.Map({"class": rs.className(["tree_widget__item_label", componentHash]), "onMousedown": this.hash(0) ? this.hash(0) : this.hash(0, (event) =>
+			{
+				this.onMouseDownItem(event, path);
+			}), "onContextmenu": this.hash(1) ? this.hash(1) : this.hash(1, (event) =>
+			{
+				this.onContextMenuItem(event, path);
+			})}));
+			__v0.push(item.label);
+			
+			return __v;
+		},
+		renderItemContent: function(item, path)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			__v.push(this.renderItemLabel(item, path));
+			
+			return __v;
+		},
+		renderItem: function(item, path)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["tree_widget__item", item == this.model.selected_item ? "selected" : "", componentHash]), "data-path": Runtime.rs.join(".", path), "key": "item." + String(Runtime.rs.join(".", path)) + String("-") + String(item.key), "onMousemove": this.hash(2) ? this.hash(2) : this.hash(2, (event) =>
+			{
+				this.onMouseMoveItem(event, path);
+			})}));
+			__v0.push(this.renderItemContent(item, path));
+			__v.push(this.renderItems(item, path));
+			
+			return __v;
+		},
+		renderItems: function(item, path)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			if (item != null && item.items != null && item.items.count() > 0)
+			{
+				let key = path.count() > 0 ? "item." + String(Runtime.rs.join(".", path)) + String(".items") : "item";
+				
+				/* Element div */
+				let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["tree_widget__items", !item.open ? "hide" : "", componentHash]), "key": key}));
+				
+				for (let i = 0; i < item.items.count(); i++)
+				{
+					__v0.push(this.renderItem(item.items.get(i), path.concat(Runtime.Vector.create([i]))));
+				}
+			}
+			
+			return __v;
+		},
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["tree_widget", componentHash]), "@ref": "widget", "onContextmenu": this.hash(3) ? this.hash(3) : this.hash(3, (event) =>
+			{
+				this.onContextMenuItem(event);
+			}), "onMousedown": this.hash(4) ? this.hash(4) : this.hash(4, (event) =>
+			{
+				this.onMouseDown(event);
+			}), "onMouseup": this.hash(5) ? this.hash(5) : this.hash(5, (event) =>
+			{
+				this.onMouseUp(event);
+			}), "onMousemove": this.hash(6) ? this.hash(6) : this.hash(6, (event) =>
+			{
+				this.onMouseMove(event);
+			})}));
+			__v0.push(this.renderBox());
+			
+			/* Element div */
+			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["tree_widget__content", componentHash]), "@ref": "content"}));
+			__v1.push(this.renderItems(this.model.root, Runtime.Vector.create([])));
+			
+			if (this.model.context_menu && this.model.context_menu_render)
+			{
+				__v.push(this.renderWidget(this.model.context_menu));
+			}
+			
+			return __v;
+		},
+		/**
+		 * Show context menu
+		 */
+		showContextMenu: function(e)
+		{
+			let x, y;
+			if (this.model.context_menu_render)
+			{
+				x = e.layerX;
+				y = e.layerY;
+			}
+			else
+			{
+				x = e.clientX;
+				y = e.clientY;
+			}
+			this.model.context_menu.show(x, y);
+		},
+		/**
+		 * Mouse context menu item click
+		 */
+		onContextMenuItem: function(e, path)
+		{
+			/* Send message context menu */
+			this.model.listener.emit(new Runtime.Widget.Tree.TreeMessage(Runtime.Map.create({
+				"name": "contextMenu",
+				"path": path,
+				"item": this.model.root.get(path),
+				"event": e,
+			})));
+			/* Select item */
+			if (this.model.autoselect)
+			{
+				this.model.selectItem(path);
+				/* Send event */
+				this.model.listener.emit(new Runtime.Widget.Tree.TreeMessage(Runtime.Map.create({
+					"kind": "context_menu",
+					"name": "selectItem",
+					"path": path,
+					"item": this.model.selected_item,
+				})));
+			}
+			/* Show context menu */
+			if (this.model.context_menu)
+			{
+				this.showContextMenu(e);
+			}
+			e.preventDefault();
+			e.stopPropagation();
+			return false;
+		},
+		/**
+		 * Mouse down
+		 */
+		onMouseDownItem: function(e, path)
+		{
+			if (e.button != 0) return;
+			/* Hide context menu */
+			if (this.model.context_menu)
+			{
+				this.model.context_menu.hide();
+			}
+			/* Select item */
+			if (this.model.autoselect)
+			{
+				this.model.selectItem(path);
+			}
+			/* Send event */
+			this.model.listener.emit(new Runtime.Widget.Tree.TreeMessage(Runtime.Map.create({
+				"kind": "click",
+				"name": "selectItem",
+				"path": path,
+				"item": this.model.root.get(path),
+				"event": e,
+			})));
+			/* Set start drag item */
+			if (this.dnd) this.dnd.setStartDragItem(e);
+			e.preventDefault();
+			e.stopPropagation();
+			return false;
+		},
+		/**
+		 * Mouse down
+		 */
+		onMouseDown: function(e)
+		{
+			if (this.model.context_menu)
+			{
+				this.model.context_menu.hide();
+			}
+		},
+		/**
+		 * Mouse tree up
+		 */
+		onMouseUp: function(e)
+		{
+			if (this.dnd) this.dnd.stopDrag();
+		},
+		/**
+		 * Mouse move item
+		 */
+		onMouseMoveItem: function(e, item)
+		{
+			if (this.dnd) this.dnd.onMouseMoveItem(e, item);
+		},
+		/**
+		 * Mouse tree move
+		 */
+		onMouseMove: function(e)
+		{
+			if (this.dnd) this.dnd.onMouseMove(e);
+		},
+		getClassName: function(){ return "Runtime.Widget.Tree.TreeWidget"; },
+	},
+	getComponentStyle: function(){ return ".tree_widget.h-fd25{position: relative;height: 100%}.tree_widget__items.h-fd25 > .tree_widget__items{padding-left: 10px}.tree_widget__items.hide.h-fd25{display: none}.tree_widget__item_label.h-fd25{display: inline-block;padding: 5px;cursor: pointer;user-select: none}.tree_widget__item.selected.h-fd25 > .tree_widget__item_label{background-color: var(--color-primary);color: var(--color-primary-text)}.tree_widget__box.h-fd25{position: absolute;border-style: solid;border-width: 0;border-color: transparent}.tree_widget__box--into.h-fd25{background-color: rgba(255, 0, 0, 0.5);pointer-events: none}.tree_widget__box--before.h-fd25, .tree_widget__box--after.h-fd25{border-top-width: 2px;border-top-color: red}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector(); },
+};
+window["Runtime.Widget.Tree.TreeWidget"] = Runtime.Widget.Tree.TreeWidget;

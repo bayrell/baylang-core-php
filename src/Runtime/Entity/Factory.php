@@ -25,9 +25,6 @@ use Runtime\Entity\Entity;
 
 class Factory extends \Runtime\Entity\Entity implements \Runtime\FactoryInterface
 {
-	/* Provider class name */
-	var $value;
-	
 	/* Factory params */
 	var $params;
 	
@@ -35,39 +32,28 @@ class Factory extends \Runtime\Entity\Entity implements \Runtime\FactoryInterfac
 	/**
 	 * Create factory
 	 */
-	function __construct($name, $value = null, $params = null)
+	function __construct($name, $params = null)
 	{
 		parent::__construct(new \Runtime\Map([
 			"name" => $name,
-			"value" => $value,
 			"params" => $params,
 		]));
 	}
 	
 	
 	/**
+	 * Returns class name
+	 */
+	function getName(){ return $this->name; }
+	
+	
+	/**
 	 * Create new object
 	 */
-	function createInstance($params = null)
+	function createInstance()
 	{
-		$instance = null;
-		$class_name = $this->value;
-		$factory_params = $this->params;
-		if ($params)
-		{
-			if ($factory_params) $factory_params = $factory_params->concat($params);
-			else $factory_params = $params;
-		}
-		if ($class_name == null) $class_name = $this->name;
-		if ($class_name instanceof \Runtime\BaseObject)
-		{
-			$instance = $class_name;
-		}
-		else if (\Runtime\rtl::isString($class_name))
-		{
-			$instance = \Runtime\rtl::newInstance($class_name, new \Runtime\Vector($factory_params));
-		}
-		return $instance;
+		$class_name = $this->getName();
+		return \Runtime\rtl::newInstance($class_name, new \Runtime\Vector($this->params));
 	}
 	
 	
@@ -75,7 +61,6 @@ class Factory extends \Runtime\Entity\Entity implements \Runtime\FactoryInterfac
 	function _init()
 	{
 		parent::_init();
-		$this->value = null;
 		$this->params = null;
 	}
 	static function getClassName(){ return "Runtime.Entity.Factory"; }

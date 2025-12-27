@@ -31,7 +31,8 @@ class TextArea extends \Runtime\Widget\Field
 		$props = $this->getProps();
 		
 		/* Element textarea */
-		$__v->element("textarea", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("textarea", $this->class, $componentHash)), "name" => $this->name, "placeholder" => $this->placeholder, "style" => $this->getStyle()]))->concat($props));
+		$__v0 = $__v->element("textarea", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("textarea", $this->class, $componentHash)), "name" => $this->name, "placeholder" => $this->placeholder, "style" => $this->getStyle()]))->concat($props));
+		$__v0->push($this->value);
 		
 		return $__v;
 	}
@@ -101,7 +102,7 @@ class TextArea extends \Runtime\Widget\Field
 		$this->placeholder = "";
 		$this->change_timer = null;
 	}
-	static function getComponentStyle(){ return ".textarea.h-ee81{width: 100%;max-width: 100%;font-family: var(--font-family);font-size: var(--font-input-size);padding: calc(var(--space) * 0.75) calc(var(--space) * 1.5);background-color: var(--color-default);border-width: var(--border-width);border-color: var(--color-border);border-style: solid;border-radius: var(--space);box-shadow: none;outline: transparent;line-height: normal;transition: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.textarea.h-ee81:focus{outline: transparent}"; }
+	static function getComponentStyle(){ return ".textarea.h-ee81{width: 100%;max-width: 100%;font-family: var(--font-family);font-size: var(--font-input-size);padding: calc(var(--space) * 0.75) calc(var(--space) * 1.5);background-color: var(--color-background);border-width: var(--border-width);border-color: var(--color-border);border-style: solid;border-radius: var(--space);box-shadow: none;outline: transparent;line-height: normal;transition: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.textarea.h-ee81:focus{outline: transparent}"; }
 	static function getRequiredComponents(){ return new \Runtime\Vector(); }
 	static function getClassName(){ return "Runtime.Widget.TextArea"; }
 }

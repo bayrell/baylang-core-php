@@ -21,7 +21,7 @@ namespace Runtime\Unit;
 use Runtime\lib;
 use Runtime\BaseProvider;
 use Runtime\BaseStruct;
-use Runtime\Callback;
+use Runtime\Method;
 use Runtime\Exceptions\AssertException;
 use Runtime\Exceptions\ItemNotFound;
 use Runtime\Unit\Test;
@@ -125,18 +125,14 @@ class TestProvider extends \Runtime\BaseProvider
 	/**
 	 * Returns true if TestMethod
 	 */
-	static function isTestMethod($method_info)
+	static function isTestMethod($annotations)
 	{
-		$annotations = $method_info["annotations"];
-		if ($annotations)
+		for ($j = 0; $j < $annotations->count(); $j++)
 		{
-			for ($j = 0; $j < $annotations->count(); $j++)
+			$annotation = $annotations->get($j);
+			if ($annotation instanceof \Runtime\Unit\Test)
 			{
-				$annotation = $annotations->get($j);
-				if ($annotation instanceof \Runtime\Unit\Test)
-				{
-					return true;
-				}
+				return true;
 			}
 		}
 		return false;
@@ -148,8 +144,8 @@ class TestProvider extends \Runtime\BaseProvider
 	 */
 	function getTestMethods($class_name)
 	{
-		$getMethodsList = new \Runtime\Callback($class_name, "getMethodsList");
-		$getMethodInfoByName = new \Runtime\Callback($class_name, "getMethodInfoByName");
+		$getMethodsList = new \Runtime\Method($class_name, "getMethodsList");
+		$getMethodInfoByName = new \Runtime\Method($class_name, "getMethodInfoByName");
 		$methods = $getMethodsList->apply();
 		$methods = $methods->filter(function ($method_name) use (&$getMethodInfoByName)
 		{
@@ -193,15 +189,15 @@ class TestProvider extends \Runtime\BaseProvider
 		$error_code = 0;
 		try
 		{
-			$callback = new \Runtime\Callback($class_name, $method_name);
+			$callback = new \Runtime\Method($class_name, $method_name);
 			if (!$callback->exists())
 			{
 				$obj = \Runtime\rtl::newInstance($class_name);
-				$callback = new \Runtime\Callback($obj, $method_name);
+				$callback = new \Runtime\Method($obj, $method_name);
 			}
 			if ($callback->exists())
 			{
-				\Runtime\rtl::apply($callback);
+				$res = $callback->apply();
 				$error_code = 1;
 				\Runtime\rtl::print($class_name . "::" . $method_name . " " . \Runtime\rtl::color("green", "Ok"));
 			}

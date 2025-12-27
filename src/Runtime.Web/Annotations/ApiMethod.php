@@ -18,14 +18,32 @@
  */
 namespace Runtime\Web\Annotations;
 
+use Runtime\Method;
 use Runtime\Entity\Entity;
+use Runtime\Web\ApiResult;
+use Runtime\Web\ApiRequest;
+
 
 class ApiMethod extends \Runtime\Entity\Entity
 {
+	var $item;
+	
+	
+	/**
+	 * Apply item
+	 */
+	function apply($request)
+	{
+		if (!$this->item) return;
+		return $this->item->apply(new \Runtime\Vector($request));
+	}
+	
+	
 	/* ========= Class init functions ========= */
 	function _init()
 	{
 		parent::_init();
+		$this->item = null;
 	}
 	static function getClassName(){ return "Runtime.Web.Annotations.ApiMethod"; }
 	static function getMethodsList(){ return null; }

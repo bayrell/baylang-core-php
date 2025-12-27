@@ -24,7 +24,7 @@ class Message extends \Runtime\BaseObject
 {
 	var $data;
 	var $name;
-	var $src;
+	var $model;
 	
 	
 	/**
@@ -44,7 +44,7 @@ class Message extends \Runtime\BaseObject
 		parent::_init();
 		$this->data = null;
 		$this->name = "";
-		$this->src = null;
+		$this->model = null;
 	}
 	static function getClassName(){ return "Runtime.Message"; }
 	static function getMethodsList(){ return null; }

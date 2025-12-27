@@ -132,7 +132,7 @@ class DateTime extends \Runtime\BaseObject implements \Runtime\StringInterface
 		$s = $this->s < 10 ? "0" . $this->s : "" . $this->s;
 		/* Get offset */
 		$offset = $this->o * 60;
-		$offset_h = \Runtime\Math::abs(\Runtime\Math::floor($offset / 60));
+		$offset_h = \Runtime\rtl::abs(\Runtime\rtl::floor($offset / 60));
 		$offset_m = $offset % 60;
 		$offset_h = $offset_h < 10 ? "0" . $offset_h : "" . $offset_h;
 		$offset_m = $offset_m < 10 ? "0" . $offset_m : "" . $offset_m;
@@ -171,7 +171,7 @@ class DateTime extends \Runtime\BaseObject implements \Runtime\StringInterface
 	/**
 	 * Returns date time string
 	 */
-	function getDateTimeString()
+	function format()
 	{
 		$m = $this->m < 10 ? "0" . $this->m : "" . $this->m;
 		$d = $this->d < 10 ? "0" . $this->d : "" . $this->d;

@@ -20,8 +20,11 @@ namespace Runtime\Web;
 
 use Runtime\BaseObject;
 use Runtime\SerializeInterface;
-use Runtime\Serializer;
+use Runtime\Serializer\MapType;
+use Runtime\Serializer\ObjectType;
+use Runtime\Serializer\StringType;
 use Runtime\Web\Cookie;
+use Runtime\Web\Hooks\AppHook;
 
 
 class Request extends \Runtime\BaseObject implements \Runtime\SerializeInterface
@@ -52,24 +55,35 @@ class Request extends \Runtime\BaseObject implements \Runtime\SerializeInterface
 	/**
 	 * Serialize object
 	 */
-	function serialize($serializer, $data)
+	static function serialize($rules)
 	{
-		$serializer->process($this, "uri", $data);
-		$serializer->process($this, "full_uri", $data);
-		$serializer->process($this, "host", $data);
-		$serializer->process($this, "method", $data);
-		$serializer->process($this, "protocol", $data);
-		$serializer->process($this, "is_https", $data);
-		$serializer->process($this, "query", $data);
+		parent::serialize($rules);
+		$rules->addType("uri", new \Runtime\Serializer\StringType());
+		$rules->addType("full_uri", new \Runtime\Serializer\StringType());
+		$rules->addType("host", new \Runtime\Serializer\StringType());
+		$rules->addType("method", new \Runtime\Serializer\StringType());
+		$rules->addType("protocol", new \Runtime\Serializer\StringType());
+		$rules->addType("is_https", new \Runtime\Serializer\StringType());
+		$rules->addType("query", new \Runtime\Serializer\MapType(new \Runtime\Serializer\StringType()));
 	}
+	
+	
+	/**
+	 * Assign rules
+	 */
+	function assignRules($rules){}
 	
 	
 	/**
 	 * Returns client ip
 	 */
-	function getClientIp()
+	function getClientIP()
 	{
-		return $this->headers->get("REMOTE_ADDR");
+		$params = \Runtime\rtl::getContext()->hook(\Runtime\Web\Hooks\AppHook::CLIENT_IP, new \Runtime\Map([
+			"headers" => $this->headers,
+			"client_ip" => $this->headers->get("REMOTE_ADDR"),
+		]));
+		return $params->get("client_ip");
 	}
 	
 	

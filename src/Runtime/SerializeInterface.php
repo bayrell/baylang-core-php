@@ -18,11 +18,12 @@
  */
 namespace Runtime;
 
+use Runtime\Serializer\ObjectType;
 
 interface SerializeInterface
 {
 	/**
-	 * Serialize object
+	 * Returns object schema
 	 */
-	function serialize($serializer, $data);
+	static function serialize($rules);
 }

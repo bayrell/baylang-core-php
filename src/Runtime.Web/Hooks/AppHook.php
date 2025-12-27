@@ -30,6 +30,7 @@ class AppHook extends \Runtime\Hooks\BaseHook
 {
 	const ASSETS = "runtime.web.app::assets";
 	const CALL_API_BEFORE = "runtime.web.app::call_api_before";
+	const CLIENT_IP = "runtime.web.app::client_ip";
 	const FIND_API = "runtime.web.app::find_api";
 	const FIND_ROUTE_BEFORE = "runtime.web.app::find_route_before";
 	const FIND_ROUTE_AFTER = "runtime.web.app::find_route_after";
@@ -59,8 +60,23 @@ class AppHook extends \Runtime\Hooks\BaseHook
 			static::ROUTE_BEFORE,
 		));
 		/* Hooks */
+		$this->register(static::ROUTE_BEFORE, "setupClientIP");
 		$this->register(static::ROUTE_BEFORE, "setupRoute");
+		$this->register(static::ROUTE_BEFORE, "setupSiteName");
 	}
+	/**
+	 * Setup client IP
+	 */
+	function setupClientIP($params)
+	{
+		$container = $params->get("container");
+		$layout = $container->layout;
+		if (!$layout) return;
+		$client_ip = $container->request->getClientIP();
+		$layout->storage->backend->set("client_ip", $client_ip);
+	}
+	
+	
 	/**
 	 * Route after
 	 */
@@ -71,6 +87,18 @@ class AppHook extends \Runtime\Hooks\BaseHook
 		if (!$layout) return;
 		$layout->storage->set("request", $container->request);
 		$layout->storage->set("route", $container->route);
+	}
+	
+	
+	/**
+	 * Setup site name
+	 */
+	function setupSiteName($params)
+	{
+		$container = $params->get("container");
+		$layout = $container->layout;
+		if (!$layout) return;
+		$layout->storage->set("site_name", $layout->getSiteName());
 	}
 	
 	

@@ -42,6 +42,12 @@ class Curl extends \Runtime\BaseObject
 	
 	
 	/**
+	 * Returns true if curl is success
+	 */
+	function isSuccess(){ return $this->code == 200; }
+	
+	
+	/**
 	 * Send
 	 */
 	function send()

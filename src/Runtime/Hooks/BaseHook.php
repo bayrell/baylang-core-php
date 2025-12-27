@@ -27,7 +27,6 @@ use Runtime\Providers\HookProvider;
 
 class BaseHook extends \Runtime\BaseObject
 {
-	var $hook;
 	var $provider;
 	
 	
@@ -45,12 +44,7 @@ class BaseHook extends \Runtime\BaseObject
 	/**
 	 * Init params
 	 */
-	function initParams($params)
-	{
-		if ($params == null) return;
-		$this->hook = $params->get("hook");
-		$this->provider = $params->get("provider");
-	}
+	function initParams($params){}
 	
 	
 	/**
@@ -74,7 +68,6 @@ class BaseHook extends \Runtime\BaseObject
 	function _init()
 	{
 		parent::_init();
-		$this->hook = null;
 		$this->provider = null;
 	}
 	static function getClassName(){ return "Runtime.Hooks.BaseHook"; }

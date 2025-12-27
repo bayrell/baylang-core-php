@@ -99,7 +99,7 @@ class RenderContainer extends \Runtime\BaseObject
 		if ($page_model)
 		{
 			$page_model->loadData($this);
-			$page_model->buildTitle($this);
+			if ($page_model == $this->layout->getPageModel()) $page_model->buildTitle($this);
 		}
 	}
 	
@@ -118,12 +118,18 @@ class RenderContainer extends \Runtime\BaseObject
 	 */
 	function getData()
 	{
-		$serializer = new \Runtime\Serializer();
-		$layout_data = $serializer->encode($this->layout);
+		$layout_data = \Runtime\rtl::serialize($this->layout);
 		$data = new \Runtime\Map([
 			"modules" => \Runtime\rtl::getContext()->modules,
+			"class" => $this->layout::getClassName(),
 			"layout" => $layout_data,
-			"storage" => new \Runtime\Map(),
+			"environments" => new \Runtime\Map([
+				"CLOUD_ENV" => \Runtime\rtl::getContext()->env("CLOUD_ENV"),
+				"DEBUG" => \Runtime\rtl::getContext()->env("DEBUG"),
+				"LOCALE" => \Runtime\rtl::getContext()->env("LOCALE"),
+				"TZ" => \Runtime\rtl::getContext()->env("TZ"),
+				"TZ_OFFSET" => \Runtime\rtl::getContext()->env("TZ_OFFSET"),
+			]),
 		]);
 		$res = \Runtime\rtl::getContext()->hook(\Runtime\Hooks\RuntimeHook::CREATE_CONTAINER_DATA, new \Runtime\Map([
 			"container" => $this,

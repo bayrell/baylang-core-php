@@ -18,7 +18,6 @@
 */
 namespace Runtime\Widget;
 
-use Runtime\Math;
 
 class Pagination extends \Runtime\Component
 {
@@ -28,8 +27,8 @@ class Pagination extends \Runtime\Component
 		$__v = new \Runtime\VirtualDom($this);
 		$__v->is_render = true;
 		
-		$page_start = \Runtime\Math::max(2, $this->page - $this->delta + 1);
-		$page_end = \Runtime\Math::min($this->page + $this->delta, $this->pages - 1);
+		$page_start = \Runtime\rtl::max(2, $this->page - $this->delta + 1);
+		$page_end = \Runtime\rtl::min($this->page + $this->delta, $this->pages - 1);
 		$props = new \Runtime\Map();
 		
 		/* Element nav */

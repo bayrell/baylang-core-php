@@ -49,6 +49,15 @@ class Map implements \JsonSerializable
 	
 	
 	/**
+	 * Convert to Object
+	 */
+	function toObject()
+	{
+		return $this->_map;
+	}
+	
+	
+	/**
 	 * Returns value from position
 	 * @param string key
 	 * @param T default_value
@@ -253,10 +262,20 @@ class Map implements \JsonSerializable
 	
 	
 	/**
+	 * Intersect
+	 */
+	function intersect($fields)
+	{
+		$h = $fields->transition(function ($value, $key){ return [$key, $value]; });
+		return $this->filter(function($value, $key) use ($h){ return $h->has($key); });
+	}
+	
+	
+	/**
 	 * Json Serialize
 	 */
 	function jsonSerialize() : mixed
 	{
-		return $this->_map;
+		return (object)$this->_map;
 	}
 }

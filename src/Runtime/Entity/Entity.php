@@ -31,7 +31,7 @@ class Entity extends \Runtime\BaseObject
 	/**
 	 * Constructor
 	 */
-	function __construct($obj)
+	function __construct($obj = null)
 	{
 		parent::__construct();
 		$this->_assign_values($obj);

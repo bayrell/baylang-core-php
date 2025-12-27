@@ -41,6 +41,7 @@ class DetectTheme extends \Runtime\Hooks\RuntimeHook
 	function initParams($params)
 	{
 		parent::initParams($params);
+		if (!$params) return;
 		if ($params->has("cookie_name")) $this->cookie_name = $params->get("cookie_name");
 	}
 	

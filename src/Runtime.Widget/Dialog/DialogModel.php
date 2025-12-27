@@ -18,55 +18,13 @@
  */
 namespace Runtime\Widget\Dialog;
 
-use Runtime\Widget\RowButtonsModel;
-use Runtime\Widget\WidgetResultModel;
-use Runtime\Widget\Dialog\BaseDialogModel;
-use Runtime\Widget\Dialog\Dialog;
+use Runtime\BaseModel;
+use Runtime\Widget\Dialog\DialogMessage;
 
 
-class DialogModel extends \Runtime\Widget\Dialog\BaseDialogModel
+class DialogModel extends \Runtime\BaseModel
 {
-	var $action;
-	var $title;
-	var $content;
-	var $width;
-	var $component;
-	var $data;
-	var $styles;
-	var $buttons;
-	var $result;
-	
-	
-	/**
-	 * Init widget params
-	 */
-	function initParams($params)
-	{
-		parent::initParams($params);
-		if ($params == null) return;
-		if ($params->has("content")) $this->content = $params->get("content");
-		if ($params->has("styles")) $this->styles = $params->get("styles");
-		if ($params->has("title")) $this->title = $params->get("title");
-		if ($params->has("width")) $this->width = $params->get("width");
-	}
-	
-	
-	/**
-	 * Init widget settings
-	 */
-	function initWidget($params)
-	{
-		parent::initWidget($params);
-		/* Add button */
-		$this->buttons = $this->addWidget("Runtime.Widget.RowButtonsModel", new \Runtime\Map([
-			"widget_name" => "buttons",
-			"styles" => new \Runtime\Vector("@widget_dialog__buttons", "align-end"),
-		]));
-		/* Add result */
-		$this->result = $this->addWidget("Runtime.Widget.WidgetResultModel", new \Runtime\Map([
-			"styles" => new \Runtime\Vector("margin_top"),
-		]));
-	}
+	var $is_open;
 	
 	
 	/**
@@ -74,26 +32,19 @@ class DialogModel extends \Runtime\Widget\Dialog\BaseDialogModel
 	 */
 	function show()
 	{
-		$this->result->clear();
-		parent::show();
+		$this->is_open = true;
 	}
 	
 	
 	/**
-	 * Set title
+	 * Hide dialog
 	 */
-	function setTitle($title)
+	function hide()
 	{
-		$this->title = $title;
-	}
-	
-	
-	/**
-	 * Set width
-	 */
-	function setWidth($value)
-	{
-		$this->width = $value;
+		$this->is_open = false;
+		$this->listener->emit(new \Runtime\Widget\Dialog\DialogMessage(new \Runtime\Map([
+			"name" => "hide",
+		])));
 	}
 	
 	
@@ -101,13 +52,7 @@ class DialogModel extends \Runtime\Widget\Dialog\BaseDialogModel
 	function _init()
 	{
 		parent::_init();
-		$this->action = "";
-		$this->title = "";
-		$this->content = "";
-		$this->width = "";
-		$this->component = "Runtime.Widget.Dialog.Dialog";
-		$this->data = new \Runtime\Map();
-		$this->styles = new \Runtime\Vector();
+		$this->is_open = false;
 	}
 	static function getClassName(){ return "Runtime.Widget.Dialog.DialogModel"; }
 	static function getMethodsList(){ return null; }

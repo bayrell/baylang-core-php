@@ -35,10 +35,10 @@ class SeoWidget extends \Runtime\Component
 		}
 		/* Locale */
 		/* Element meta */
-		$__v->element("meta", (new \Runtime\Map(["property" => "og:locale", "content" => $this->layout->getLocale()])));
+		$__v->element("meta", (new \Runtime\Map(["property" => "og:locale", "content" => $this->layout->lang])));
 		/* Title and description */
 		/* Element meta */
-		$__v->element("meta", (new \Runtime\Map(["property" => "og:title", "content" => $this->layout->getFullTitle()])));
+		$__v->element("meta", (new \Runtime\Map(["property" => "og:title", "content" => $this->layout->title])));
 		
 		if ($this->model->description != "")
 		{

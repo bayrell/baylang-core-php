@@ -18,11 +18,13 @@
  */
 namespace Runtime\Widget;
 
+use Runtime\ApiResult;
 use Runtime\BaseModel;
 use Runtime\SerializeInterface;
-use Runtime\Serializer;
+use Runtime\Serializer\IntegerType;
+use Runtime\Serializer\ObjectType;
+use Runtime\Serializer\StringType;
 use Runtime\Exceptions\AbstractException;
-use Runtime\Web\ApiResult;
 use Runtime\Widget\Result;
 
 
@@ -31,6 +33,17 @@ class ResultModel extends \Runtime\BaseModel
 	var $code;
 	var $message;
 	var $component;
+	
+	
+	/**
+	 * Serialize object
+	 */
+	static function serialize($rules)
+	{
+		parent::serialize($rules);
+		$rules->addType("code", new \Runtime\Serializer\IntegerType());
+		$rules->addType("message", new \Runtime\Serializer\StringType());
+	}
 	
 	
 	/**
@@ -121,17 +134,6 @@ class ResultModel extends \Runtime\BaseModel
 	 * Returns true if success
 	 */
 	function isSuccess(){ return $this->code > 0; }
-	
-	
-	/**
-	 * Process frontend data
-	 */
-	function serialize($serializer, $data)
-	{
-		$serializer->process($this, "code", $data);
-		$serializer->process($this, "message", $data);
-		parent::serialize($serializer, $data);
-	}
 	
 	
 	/* ========= Class init functions ========= */

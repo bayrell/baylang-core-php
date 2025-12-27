@@ -22,6 +22,7 @@ use Runtime\BaseObject;
 use Runtime\BaseModel;
 use Runtime\Reference;
 use Runtime\Serializer;
+use Runtime\Serializer\ObjectType;
 use Runtime\Web\Events;
 use Runtime\Widget\ContextMenu\ContextMenuModel;
 use Runtime\Widget\Tree\TreeItem;
@@ -32,16 +33,28 @@ use Runtime\Widget\Tree\TreeWidget;
 class TreeModel extends \Runtime\BaseModel
 {
 	var $component;
-	var $widget_name;
 	var $autoselect;
 	var $dnd;
 	var $icons;
 	var $is_open;
-	var $render_context_menu;
+	var $context_menu_render;
 	var $context_menu;
 	var $selected_path;
 	var $selected_item;
 	var $root;
+	
+	
+	/**
+	 * Serialize object
+	 */
+	static function serialize($rules)
+	{
+		parent::serialize($rules);
+		$rules->addType("root", new \Runtime\Serializer\ObjectType(new \Runtime\Map([
+			"autocreate" => true,
+			"extends" => "Runtime.Widget.Tree.TreeItem",
+		])));
+	}
 	
 	
 	/**
@@ -67,17 +80,11 @@ class TreeModel extends \Runtime\BaseModel
 		if ($params->has("context_menu"))
 		{
 			$this->setContextMenu($params->get("context_menu"));
+			if ($params->has("context_menu_render"))
+			{
+				$this->context_menu_render = $params->get("context_menu_render");
+			}
 		}
-	}
-	
-	
-	/**
-	 * Serialize object
-	 */
-	function serialize($serializer, $data)
-	{
-		$serializer->process($this, "root", $data);
-		parent::serialize($serializer, $data);
 	}
 	
 	
@@ -86,18 +93,15 @@ class TreeModel extends \Runtime\BaseModel
 	 */
 	function setContextMenu($context_menu)
 	{
-		$this->render_context_menu = true;
-		if ($context_menu instanceof \Runtime\Dict)
+		if ($context_menu instanceof \Runtime\Widget\ContextMenu\ContextMenuModel)
 		{
-			$this->context_menu = $this->addWidget("Runtime.Widget.ContextMenu.ContextMenuModel", $context_menu);
+			$this->context_menu_render = false;
+			$this->context_menu = $context_menu;
 		}
-		else
+		else if ($context_menu instanceof \Runtime\Map)
 		{
-			$this->context_menu = $this->createModel($context_menu);
-			if ($context_menu instanceof \Runtime\BaseModel)
-			{
-				$this->render_context_menu = false;
-			}
+			$this->context_menu_render = true;
+			$this->context_menu = $this->createWidget("Runtime.Widget.ContextMenu.ContextMenuModel", $context_menu);
 		}
 	}
 	
@@ -189,12 +193,11 @@ class TreeModel extends \Runtime\BaseModel
 	{
 		parent::_init();
 		$this->component = "Runtime.Widget.Tree.TreeWidget";
-		$this->widget_name = "tree";
 		$this->autoselect = true;
 		$this->dnd = false;
 		$this->icons = true;
 		$this->is_open = false;
-		$this->render_context_menu = true;
+		$this->context_menu_render = true;
 		$this->context_menu = null;
 		$this->selected_path = null;
 		$this->selected_item = null;

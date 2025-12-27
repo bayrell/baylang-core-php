@@ -45,10 +45,8 @@ class HookProvider extends \Runtime\BaseProvider
 		for ($i = 0; $i < $hooks->count(); $i++)
 		{
 			$hook = $hooks[$i];
-			$base_hook = $hook->createInstance(new \Runtime\Map([
-				"hook" => $hook,
-				"provider" => $this,
-			]));
+			$base_hook = $hook->createInstance();
+			$base_hook->provider = $this;
 			$base_hook->register_hooks();
 			$this->base_hooks->push($base_hook);
 		}

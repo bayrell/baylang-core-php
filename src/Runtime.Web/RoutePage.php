@@ -19,7 +19,8 @@
 namespace Runtime\Web;
 
 use Runtime\BaseModel;
-use Runtime\Serializer;
+use Runtime\Serializer\ObjectType;
+use Runtime\Serializer\StringType;
 use Runtime\Web\RouteInfo;
 use Runtime\Web\RenderContainer;
 
@@ -32,10 +33,10 @@ class RoutePage extends \Runtime\Web\RouteInfo
 	/**
 	 * Process frontend data
 	 */
-	function serialize($serializer, $data)
+	static function serialize($rules)
 	{
-		$serializer->process($this, "page", $data);
-		parent::serialize($serializer, $data);
+		parent::serialize($rules);
+		$rules->addType("page", new \Runtime\Serializer\StringType());
 	}
 	
 	
@@ -45,10 +46,9 @@ class RoutePage extends \Runtime\Web\RouteInfo
 	function render($container)
 	{
 		$container->layout->current_page_model = "page_model";
-		$page_model = $container->layout->addWidget("Runtime.BaseModel", new \Runtime\Map([
-			"widget_name" => "page_model",
+		$container->layout->pages->set("page_model", $container->layout->createWidget("Runtime.BaseModel", new \Runtime\Map([
 			"component" => $this->page,
-		]));
+		])));
 		if ($this->data)
 		{
 			$title = $this->data->get("title");

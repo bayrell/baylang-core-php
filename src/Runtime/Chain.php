@@ -83,7 +83,8 @@ class Chain extends \Runtime\Method
 		{
 			$item = $this->chain->get($i);
 			$f = $item->get("method");
-			$f->apply($args);
+			if ($f instanceof \Runtime\Method) $f->apply($args);
+			else \Runtime\rtl::apply($f, $args);
 		}
 	}
 	

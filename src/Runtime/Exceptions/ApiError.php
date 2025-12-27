@@ -18,15 +18,20 @@
  */
 namespace Runtime\Exceptions;
 
+use Runtime\ApiResult;
 use Runtime\RuntimeConstant;
 use Runtime\Exceptions\RuntimeException;
 
 
 class ApiError extends \Runtime\Exceptions\RuntimeException
 {
+	var $result;
+	
+	
 	function __construct($prev = null)
 	{
-		parent::__construct($prev->getErrorMessage(), \Runtime\rtl::ERROR_API_ERROR, $prev);
+		parent::__construct($prev->getErrorMessage(), \Runtime\rtl::ERROR_API, $prev instanceof \Runtime\Exceptions\RuntimeException ? $prev : null);
+		if ($prev instanceof \Runtime\ApiResult) $this->result = $prev;
 	}
 	
 	
@@ -79,6 +84,7 @@ class ApiError extends \Runtime\Exceptions\RuntimeException
 	function _init()
 	{
 		parent::_init();
+		$this->result = null;
 	}
 	static function getClassName(){ return "Runtime.Exceptions.ApiError"; }
 	static function getMethodsList(){ return null; }

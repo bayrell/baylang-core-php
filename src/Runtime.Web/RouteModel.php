@@ -18,7 +18,9 @@
  */
 namespace Runtime\Web;
 
-use Runtime\Serializer;
+use Runtime\Serializer\MapType;
+use Runtime\Serializer\ObjectType;
+use Runtime\Serializer\StringType;
 use Runtime\Web\RouteInfo;
 use Runtime\Web\RenderContainer;
 
@@ -32,11 +34,11 @@ class RouteModel extends \Runtime\Web\RouteInfo
 	/**
 	 * Process frontend data
 	 */
-	function serialize($serializer, $data)
+	static function serialize($rules)
 	{
-		$serializer->process($this, "model", $data);
-		$serializer->process($this, "model_params", $data);
-		parent::serialize($serializer, $data);
+		parent::serialize($rules);
+		$rules->addType("model", new \Runtime\Serializer\StringType());
+		$rules->addType("model_params", new \Runtime\Serializer\MapType());
 	}
 	
 	
@@ -57,7 +59,7 @@ class RouteModel extends \Runtime\Web\RouteInfo
 	function _init()
 	{
 		parent::_init();
-		$this->model = null;
+		$this->model = "";
 		$this->model_params = null;
 	}
 	static function getClassName(){ return "Runtime.Web.RouteModel"; }

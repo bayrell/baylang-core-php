@@ -15,6 +15,10 @@
         "psr-4": {
             "Runtime\\": "src/Runtime",
             "Runtime\\Console\\": "src/Runtime.Console",
+            "Runtime\\Core\\": "src/Runtime.Core",
+            "Runtime\\Crypt\\": "src/Runtime.Crypt",
+            "Runtime\\ORM\\": "src/Runtime.ORM",
+            "Runtime\\Test\\": "src/Runtime.Test",
             "Runtime\\Unit\\": "src/Runtime.Unit",
             "Runtime\\Web\\": "src/Runtime.Web",
             "Runtime\\Widget\\": "src/Runtime.Widget"

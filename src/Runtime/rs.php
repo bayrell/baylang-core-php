@@ -534,6 +534,23 @@ class rs
 	
 	
 	/**
+	 * Url get add
+	 */
+	static function urlGetAdd($s, $params)
+	{
+		$keys = \Runtime\rtl::list($params->keys());
+		for ($i = 0; $i < $keys->count(); $i++)
+		{
+			$key = $keys->get($i);
+			$value = $params->get($key);
+			if (!$value) continue;
+			$s = static::url_get_add($s, $key, $value);
+		}
+		return $s;
+	}
+	
+	
+	/**
 	 * Strip tags
 	 */
 	static function strip_tags($content, $allowed_tags = null)

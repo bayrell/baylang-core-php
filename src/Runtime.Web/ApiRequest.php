@@ -39,7 +39,7 @@ class ApiRequest extends \Runtime\BaseObject
 	/**
 	 * Returns value
 	 */
-	function get($name){ return $this->data->get($name); }
+	function get($name){ return $this->data ? $this->data->get($name) : null; }
 	
 	
 	/* ========= Class init functions ========= */

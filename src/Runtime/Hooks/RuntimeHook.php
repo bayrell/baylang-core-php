@@ -37,6 +37,7 @@ class RuntimeHook extends \Runtime\Hooks\BaseHook
 	const CREATE_CONTAINER_DATA = "runtime::create_container_data";
 	const CREATE_LAYOUT = "runtime::create_layout";
 	const CHANGE_LAYOUT = "runtime::change_layout";
+	const SEND_API_BEFORE = "runtime::send_api_before";
 	const TITLE = "runtime::title";
 	
 	

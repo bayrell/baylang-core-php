@@ -35,11 +35,10 @@ class RenderProvider extends \Runtime\BaseProvider
 	 */
 	function createLayout($app_data)
 	{
+		$class_name = $app_data->get("class");
 		$layout_data = $app_data->get("layout");
-		$class_name = $layout_data->get("__class_name__");
 		$layout = \Runtime\rtl::newInstance($class_name);
-		$serializer = new \Runtime\Serializer();
-		$serializer->assign($layout, $layout_data);
+		\Runtime\rtl::assign($layout, $layout_data);
 		return $window["Vue"]->reactive($layout);
 	}
 	
@@ -135,17 +134,11 @@ class RenderProvider extends \Runtime\BaseProvider
 		$children = $content;
 		if ($vdom->is_component)
 		{
-			$slots = $vdom->slots->map(function ($f)
-			{
-				return function () use (&$f)
-				{
-					$vdom = $f();
-					return $this->render($vdom);
-				};
-			});
-			$children = $slots->toObject();
 		}
-		if ($children instanceof \Runtime\Vector) $children = $children->flatten();
+		if ($children instanceof \Runtime\Vector)
+		{
+			$children = $children->flatten()->filter(function ($item){ return $item != null && $item != ""; });
+		}
 		$attrs = $vdom->attrs;
 		if ($attrs instanceof \Runtime\Map)
 		{

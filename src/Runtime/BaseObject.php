@@ -18,6 +18,7 @@
  */
 namespace Runtime;
 
+use Runtime\Serializer\ObjectType;
 
 class BaseObject
 {
@@ -42,6 +43,15 @@ class BaseObject
 	 * Init function
 	 */
 	function _init(){}
+	
+	
+	/**
+	 * Serialize object
+	 */
+	static function serialize($rules)
+	{
+		$rules->setClassName(static::getClassName());
+	}
 	
 	
 	/**

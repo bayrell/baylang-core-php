@@ -57,7 +57,7 @@ class Listener extends \Runtime\BaseObject
 		if (!($f instanceof \Runtime\Method)) return;
 		if (!$this->listeners->has($message_name))
 		{
-			$this->clearListener($message_name);
+			$this->clear($message_name);
 		}
 		$chain = $this->listeners->get($message_name);
 		$chain->add($f, $priority);
@@ -70,11 +70,11 @@ class Listener extends \Runtime\BaseObject
 	 */
 	function emit($message)
 	{
-		if ($message->src == null)
+		if ($message->model == null)
 		{
-			$message->src = $this->object;
+			$message->model = $this->object;
 		}
-		$this->emitMessage(message::getClassName(), $message);
+		$this->emitMessage($message::getClassName(), $message);
 		$this->emitMessage($message->name, $message);
 	}
 	
@@ -84,11 +84,11 @@ class Listener extends \Runtime\BaseObject
 	 */
 	function emitAsync($message)
 	{
-		if ($message->src == null)
+		if ($message->model == null)
 		{
-			$message->src = $this->object;
+			$message->model = $this->object;
 		}
-		$res1 = $this->emitMessage(message::getClassName(), $message);
+		$res1 = $this->emitMessage($message::getClassName(), $message);
 		$res2 = $this->emitMessage($message->name, $message);
 	}
 	

@@ -19,10 +19,15 @@
 namespace Runtime\Web;
 
 use Runtime\re;
-use Runtime\BaseObject;
 use Runtime\Method;
+use Runtime\BaseObject;
 use Runtime\SerializeInterface;
-use Runtime\Serializer;
+use Runtime\Serializer\IntegerType;
+use Runtime\Serializer\MapType;
+use Runtime\Serializer\ObjectType;
+use Runtime\Serializer\StringType;
+use Runtime\Serializer\VectorType;
+use Runtime\TypeError;
 use Runtime\Entity\Factory;
 use Runtime\Exceptions\ItemNotFound;
 use Runtime\Exceptions\RuntimeException;
@@ -61,22 +66,22 @@ class RouteInfo extends \Runtime\BaseObject implements \Runtime\SerializeInterfa
 	
 	
 	/**
-	 * Process frontend data
+	 * Serialize object
 	 */
-	function serialize($serializer, $data)
+	static function serialize($rules)
 	{
-		$serializer->process($this, "data", $data);
-		$serializer->process($this, "domain", $data);
-		$serializer->process($this, "label", $data);
-		$serializer->process($this, "layout", $data);
-		$serializer->process($this, "matches", $data);
-		$serializer->process($this, "middleware", $data);
-		$serializer->process($this, "name", $data);
-		$serializer->process($this, "params", $data);
-		$serializer->process($this, "pos", $data);
-		$serializer->process($this, "route_class", $data);
-		$serializer->process($this, "uri", $data);
-		$serializer->process($this, "uri_match", $data);
+		parent::serialize($rules);
+		$rules->addType("data", new \Runtime\Serializer\MapType(new \Runtime\Serializer\StringType()));
+		$rules->addType("domain", new \Runtime\Serializer\StringType());
+		$rules->addType("label", new \Runtime\Serializer\StringType());
+		$rules->addType("layout", new \Runtime\Serializer\StringType());
+		$rules->addType("name", new \Runtime\Serializer\StringType());
+		$rules->addType("matches", new \Runtime\Serializer\MapType(new \Runtime\Serializer\StringType()));
+		$rules->addType("params", new \Runtime\Serializer\VectorType(new \Runtime\Serializer\StringType()));
+		$rules->addType("pos", new \Runtime\Serializer\IntegerType());
+		$rules->addType("route_class", new \Runtime\Serializer\StringType());
+		$rules->addType("uri", new \Runtime\Serializer\StringType());
+		$rules->addType("uri_match", new \Runtime\Serializer\StringType());
 	}
 	
 	
@@ -85,7 +90,7 @@ class RouteInfo extends \Runtime\BaseObject implements \Runtime\SerializeInterfa
 	 */
 	function copy()
 	{
-		return \Runtime\Serializer::copy($this);
+		return \Runtime\rtl::copy($this);
 	}
 	
 	

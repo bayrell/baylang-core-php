@@ -98,6 +98,16 @@ class Vector implements \ArrayAccess, \JsonSerializable, \IteratorAggregate
 	
 	
 	/**
+	 * Remove item
+	 */
+	function removeItem($item)
+	{
+		$pos = $this->find(function ($elem) use ($item){ return $elem == $item; });
+		if ($pos >=0) $this->remove($pos);
+	}
+	
+	
+	/**
 	 * Append value to the end of array
 	 * @param T value
 	 */
@@ -339,6 +349,7 @@ class Vector implements \ArrayAccess, \JsonSerializable, \IteratorAggregate
 	function reverse()
 	{
 		$this->_arr = array_reverse($this->_arr);
+		return $this;
 	}
 	
 	

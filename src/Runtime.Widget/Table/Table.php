@@ -18,11 +18,6 @@
 */
 namespace Runtime\Widget\Table;
 
-use Runtime\Web\RenderListModel;
-use Runtime\Widget\Pagination;
-use Runtime\Widget\RowButtons;
-use Runtime\Widget\Table\TableModel;
-
 
 class Table extends \Runtime\Component
 {
@@ -31,80 +26,7 @@ class Table extends \Runtime\Component
 		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
 		$__v = new \Runtime\VirtualDom($this);
 		
-		$model = $this->model;
-		$fields = $model->fields;
-		if ($fields)
-		{
-			/* Element tr */
-			$__v0 = $__v->element("tr", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_table__row_header", $componentHash))])));
-			
-			for ($i = 0; $i < $fields->count(); $i++)
-			{
-				$field = $fields[$i];
-				$field_name = $field->get("name");
-				
-				/* Element th */
-				$__v1 = $__v0->element("th", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_table__th widget_table__th--" . $field_name, $componentHash))])));
-				$__v1->push($field->get("label", ""));
-			}
-		}
-		
-		return $__v;
-	}
-	function renderField($item, $row_number, $field)
-	{
-		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
-		$__v = new \Runtime\VirtualDom($this);
-		
-		$model = $this->model;
-		$storage = $model->storage;
-		$field_name = $field->get("name");
-		$field_calculate = $field->get("calculate", null);
-		$field_component = $field->get("component", null);
-		$field_model = $field->get("model", null);
-		$value = "";
-		$data = new \Runtime\Map([
-			"item" => $item,
-			"field_name" => $field_name,
-			"row_number" => $row_number,
-			"table" => $this->model,
-		]);
-		if ($field_calculate)
-		{
-			$value = \Runtime\rtl::apply($field_calculate, new \Runtime\Vector($data));
-		}
-		else
-		{
-			$value = $this->model->getItemValue($item, $field_name);
-		}
-		
-		$_ = $data->set("value", $value);
-		
-		/* Element td */
-		$__v0 = $__v->element("td", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_table__td widget_table__td--" . $field_name, $componentHash))])));
-		
-		if ($field_name == "row_number")
-		{
-			$__v0->push($this->model->limit * $this->model->page + $row_number + 1);
-		}
-		else if ($field_component != null)
-		{
-			$props = $field->get("props", new \Runtime\Map());
-			
-			/* Element $field_component */
-			$__v0->element($field_component, (new \Runtime\Map(["value" => $value, "data" => $data]))->concat($props));
-		}
-		else if ($field_model != null)
-		{
-			$__v0->push($this->renderWidget($field_model, new \Runtime\Map([
-				"value" => $value,
-				"data" => $data,
-			])));
-		}
-		else
-		{
-			$__v0->push($value);
-		}
+		$__v->push($this->renderSlot("header"));
 		
 		return $__v;
 	}
@@ -113,73 +35,7 @@ class Table extends \Runtime\Component
 		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
 		$__v = new \Runtime\VirtualDom($this);
 		
-		$model = $this->model;
-		$fields = $model->fields;
-		
-		/* Element tr */
-		$__v0 = $__v->element("tr", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_table__tr", $this->isRowSelected($row_number) ? "selected" : "", $componentHash)), "data-row" => $row_number])));
-		
-		if ($fields)
-		{
-			for ($i = 0; $i < $fields->count(); $i++)
-			{
-				$field = $fields[$i];
-				$__v0->push($this->renderField($item, $row_number, $field));
-			}
-		}
-		
-		return $__v;
-	}
-	function renderPagination()
-	{
-		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
-		$__v = new \Runtime\VirtualDom($this);
-		
-		$fields = $this->model->fields;
-		if ($fields && $this->model->pages > 1)
-		{
-			$props = $this->model->pagination_props;
-			$pagination_class_name = $this->model->pagination_class_name;
-			
-			/* Element tr */
-			$__v0 = $__v->element("tr");
-			
-			/* Element td */
-			$__v1 = $__v0->element("td", (new \Runtime\Map(["colspan" => $fields->count()])));
-			
-			/* Element $pagination_class_name */
-			$__v1->element($pagination_class_name, (new \Runtime\Map(["page" => $this->model->page + 1, "pages" => $this->model->pages]))->concat($props));
-		}
-		
-		return $__v;
-	}
-	function renderBody()
-	{
-		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
-		$__v = new \Runtime\VirtualDom($this);
-		
-		if ($this->model && $this->model->storage)
-		{
-			$items = $this->model->storage->getItems();
-			if ($items)
-			{
-				for ($i = 0; $i < $items->count(); $i++)
-				{
-					$item = $items->get($i);
-					$__v->push($this->renderRow($item, $i));
-				}
-			}
-			$__v->push($this->renderPagination());
-		}
-		
-		return $__v;
-	}
-	function renderTopButtons()
-	{
-		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
-		$__v = new \Runtime\VirtualDom($this);
-		
-		$__v->push($this->renderWidget($this->model->top_buttons));
+		$__v->push($this->renderSlot("row", new \Runtime\Vector($item, $row_number)));
 		
 		return $__v;
 	}
@@ -189,21 +45,26 @@ class Table extends \Runtime\Component
 		$__v = new \Runtime\VirtualDom($this);
 		
 		/* Element table */
-		$__v0 = $__v->element("table", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_table__table", $componentHash))])));
+		$__v0 = $__v->element("table");
 		
 		/* Element tbody */
 		$__v1 = $__v0->element("tbody");
-		$__v1->push($this->renderHeader());
-		$__v1->push($this->renderBody());
 		
-		return $__v;
-	}
-	function renderWidgets()
-	{
-		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
-		$__v = new \Runtime\VirtualDom($this);
+		/* Element tr */
+		$__v2 = $__v1->element("tr", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("table__header", $componentHash))])));
+		$__v2->push($this->renderHeader());
 		
-		$__v->push($this->renderWidget($this->model->render_list));
+		if ($this->model->items)
+		{
+			for ($i = 0; $i < $this->model->items->count(); $i++)
+			{
+				$item = $this->model->items->get($i);
+				
+				/* Element tr */
+				$__v3 = $__v1->element("tr", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("table__row", $componentHash))])));
+				$__v3->push($this->renderRow($item, $i));
+			}
+		}
 		
 		return $__v;
 	}
@@ -214,35 +75,18 @@ class Table extends \Runtime\Component
 		$__v->is_render = true;
 		
 		/* Element div */
-		$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_table", $this->class, static::mergeStyles("widget_table", $this->model->styles), $componentHash))])));
-		$__v0->push($this->renderTopButtons());
+		$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("table", $componentHash))])));
 		$__v0->push($this->renderTable());
-		$__v0->push($this->renderWidgets());
 		
 		return $__v;
 	}
-	/**
-	 * Returns true if row selected
-	 */
-	function isRowSelected($row_number){ return $this->model->row_selected == $row_number; }
-	/**
-	 * OnRowClick
-	 */
-	function onRowClick($row_number)
-	{
-		$this->model->onRowClick($row_number);
-	}
-	/**
-	 * On change page
-	 */
-	function onChangePage($page){}
 	
 	/* ========= Class init functions ========= */
 	function _init()
 	{
 		parent::_init();
 	}
-	static function getComponentStyle(){ return ".widget_table__table.h-6433{width: auto;border-collapse: collapse;vertical-align: top;background-color: var(--widget-color-table-background)}.widget_table__th.h-6433{text-align: center}.widget_table__th.h-6433, .widget_table__td.h-6433{vertical-align: middle;padding: var(--widget-space)}.widget_table__tr.selected.h-6433 td{background-color: var(--widget-color-selected);color: var(--widget-color-selected-text)}.widget_table--border.h-6433 .widget_table__table{border-color: var(--widget-color-border);border-width: var(--widget-border-width);border-style: solid}.widget_table--border.h-6433 .widget_table__th, .widget_table--border.h-6433 .widget_table__td{border-bottom-color: var(--widget-color-border);border-bottom-width: var(--widget-border-width);border-bottom-style: solid}.widget_table--stretch.h-6433 .widget_table__table{width: 100%}"; }
-	static function getRequiredComponents(){ return new \Runtime\Vector("Runtime.Widget.Pagination"); }
+	static function getComponentStyle(){ return ".table.h-6433 table{border-collapse: collapse;background-color: var(--color-background);border: 1px var(--color-border) solid}.table.h-6433 th, .table.h-6433 td{padding: var(--space);border-bottom: 1px var(--color-border) solid}.table.h-6433 th{font-weight: bold}.table__row.h-6433:nth-child(even){background-color: var(--color-surface)}.table__row.h-6433:last-child{border-bottom-width: 0px}"; }
+	static function getRequiredComponents(){ return new \Runtime\Vector(); }
 	static function getClassName(){ return "Runtime.Widget.Table.Table"; }
 }

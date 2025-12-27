@@ -58,7 +58,7 @@ class ModuleDescription
 	static function entities()
 	{
 		return new \Runtime\Vector(
-			new \Runtime\Entity\Provider("Runtime.Unit.TestProvider", new \Runtime\Unit\TestProvider()),
+			new \Runtime\Entity\Provider("Runtime.Unit.TestProvider"),
 		);
 	}
 	

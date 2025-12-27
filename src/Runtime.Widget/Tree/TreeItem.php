@@ -22,6 +22,9 @@ use Runtime\lib;
 use Runtime\BaseObject;
 use Runtime\SerializeInterface;
 use Runtime\Serializer;
+use Runtime\Serializer\ObjectType;
+use Runtime\Serializer\StringType;
+use Runtime\Serializer\VectorType;
 use Runtime\Widget\Tree\TreeModel;
 
 
@@ -34,23 +37,33 @@ class TreeItem extends \Runtime\BaseObject implements \Runtime\SerializeInterfac
 	
 	
 	/**
+	 * Serialize object
+	 */
+	static function serialize($rules)
+	{
+		parent::serialize($rules);
+		$rules->addType("key", new \Runtime\Serializer\StringType());
+		$rules->addType("label", new \Runtime\Serializer\StringType());
+		$rules->addType("items", new \Runtime\Serializer\VectorType(new \Runtime\Serializer\ObjectType(new \Runtime\Map([
+			"autocreate" => true,
+			"extends" => "Runtime.Widget.Tree.TreeItem",
+		]))));
+	}
+	
+	
+	/**
+	 * Assign rules
+	 */
+	function assignRules($rules){}
+	
+	
+	/**
 	 * Constructor
 	 */
 	function __construct($params = null)
 	{
 		parent::__construct();
 		$this->_assign_values($params);
-	}
-	
-	
-	/**
-	 * Serialize object
-	 */
-	function serialize($serializer, $data)
-	{
-		$serializer->process($this, "key", $data);
-		$serializer->process($this, "label", $data);
-		$serializer->process($this, "items", $data);
 	}
 	
 	
@@ -105,7 +118,7 @@ class TreeItem extends \Runtime\BaseObject implements \Runtime\SerializeInterfac
 		parent::_init();
 		$this->key = "";
 		$this->label = "";
-		$this->open = true;
+		$this->open = false;
 		$this->items = new \Runtime\Vector();
 	}
 	static function getClassName(){ return "Runtime.Widget.Tree.TreeItem"; }

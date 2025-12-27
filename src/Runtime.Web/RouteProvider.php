@@ -167,6 +167,15 @@ class RouteProvider extends \Runtime\BaseProvider
 	
 	
 	/**
+	 * Returns route by name
+	 */
+	function getRoute($route_name)
+	{
+		return $this->routes_list->find(function ($route) use (&$route_name){ return $route->name == $route_name; });
+	}
+	
+	
+	/**
 	 * Find route
 	 */
 	function findRoute($request)

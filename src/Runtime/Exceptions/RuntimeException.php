@@ -157,7 +157,7 @@ class RuntimeException extends \Runtime\Exceptions\ClassException
 			},
 			$error_trace
 		);
-		return \Runtime\Collection::from($error_trace);
+		return \Runtime\Vector::create($error_trace);
 	}
 	
 	

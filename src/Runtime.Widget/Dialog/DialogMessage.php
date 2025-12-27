@@ -19,21 +19,19 @@
 namespace Runtime\Widget\Dialog;
 
 use Runtime\Message;
-use Runtime\Widget\Dialog\DialogModel;
-
 
 class DialogMessage extends \Runtime\Message
 {
+	var $action;
 	var $value;
-	var $hide;
 	
 	
 	/* ========= Class init functions ========= */
 	function _init()
 	{
 		parent::_init();
+		$this->action = "";
 		$this->value = "";
-		$this->hide = true;
 	}
 	static function getClassName(){ return "Runtime.Widget.Dialog.DialogMessage"; }
 	static function getMethodsList(){ return null; }

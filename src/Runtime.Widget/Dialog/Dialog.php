@@ -19,8 +19,7 @@
 namespace Runtime\Widget\Dialog;
 
 use Runtime\Widget\Button;
-use Runtime\Widget\RowButtons;
-use Runtime\Widget\WidgetResult;
+use Runtime\Widget\Dialog\DialogModel;
 
 
 class Dialog extends \Runtime\Component
@@ -30,12 +29,42 @@ class Dialog extends \Runtime\Component
 		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
 		$__v = new \Runtime\VirtualDom($this);
 		
-		if ($this->model->title != "")
+		$__v->push($this->renderSlot("title"));
+		
+		return $__v;
+	}
+	function renderHeader()
+	{
+		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
+		$__v = new \Runtime\VirtualDom($this);
+		
+		/* Element div */
+		$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("dialog__header", $componentHash))])));
+		
+		/* Element div */
+		$__v1 = $__v0->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("dialog__header_title", $componentHash))])));
+		$__v1->push($this->renderTitle());
+		
+		/* Element Runtime.Widget.Button */
+		$__v2 = $__v0->element("Runtime.Widget.Button", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("dialog__header_close button--small", $componentHash))])));
+		
+		/* Content */
+		$__v2->slot("default", function ()
 		{
-			/* Element div */
-			$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_dialog__title", $componentHash))])));
-			$__v0->push($this->model->title);
-		}
+			$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
+			$__v = new \Runtime\VirtualDom($this);
+			
+			/* Element svg */
+			$__v0 = $__v->element("svg", (new \Runtime\Map(["width" => "16", "height" => "16", "viewBox" => "0 0 16 16", "fill" => "none", "xmlns" => "http://www.w3.org/2000/svg"])));
+			
+			/* Element path */
+			$__v0->element("path", (new \Runtime\Map(["d" => "M12 4L4 12", "stroke" => "currentColor", "stroke-width" => "2", "stroke-linecap" => "round", "stroke-linejoin" => "round"])));
+			
+			/* Element path */
+			$__v0->element("path", (new \Runtime\Map(["d" => "M4 4L12 12", "stroke" => "currentColor", "stroke-width" => "2", "stroke-linecap" => "round", "stroke-linejoin" => "round"])));
+			
+			return $__v;
+		});
 		
 		return $__v;
 	}
@@ -45,51 +74,22 @@ class Dialog extends \Runtime\Component
 		$__v = new \Runtime\VirtualDom($this);
 		
 		/* Element div */
-		$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_dialog__content", $componentHash))])));
-		$__v0->push($this->model->content);
+		$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("dialog__content", $componentHash))])));
+		$__v0->push($this->renderSlot("content"));
 		
 		return $__v;
 	}
-	function renderButtons()
+	function renderFooter()
 	{
 		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
 		$__v = new \Runtime\VirtualDom($this);
 		
-		$__v->push($this->renderWidget($this->model->buttons));
-		
-		return $__v;
-	}
-	function renderResult()
-	{
-		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
-		$__v = new \Runtime\VirtualDom($this);
-		
-		$__v->push($this->renderWidget($this->model->result));
-		
-		return $__v;
-	}
-	function renderDialog()
-	{
-		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
-		$__v = new \Runtime\VirtualDom($this);
-		
-		$__v->push($this->renderTitle());
-		$__v->push($this->renderContent());
-		$__v->push($this->renderButtons());
-		$__v->push($this->renderResult());
-		
-		return $__v;
-	}
-	function renderDialogContainer()
-	{
-		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
-		$__v = new \Runtime\VirtualDom($this);
-		
-		$props = $this->getProps();
-		
-		/* Element div */
-		$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_dialog__container", $componentHash))]))->concat($props));
-		$__v0->push($this->renderDialog());
+		if ($this->slot("footer"))
+		{
+			/* Element div */
+			$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("dialog__footer", $componentHash))])));
+			$__v0->push($this->renderSlot("footer"));
+		}
 		
 		return $__v;
 	}
@@ -100,84 +100,53 @@ class Dialog extends \Runtime\Component
 		$__v->is_render = true;
 		
 		/* Element div */
-		$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_dialog", $this->model->is_open ? "widget_dialog--open" : "widget_dialog--hide", static::mergeStyles("widget_dialog", $this->model->styles), $componentHash))])));
+		$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("dialog", $this->model->is_open ? "dialog--open" : "", $componentHash))])));
 		
 		/* Element div */
-		$__v0->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_dialog__shadow", $componentHash))])));
-		
-		/* Element div */
-		$__v1 = $__v0->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_dialog__box", $componentHash))])));
-		
-		/* Element table */
-		$__v2 = $__v1->element("table", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_dialog__wrap", $componentHash))])));
-		
-		/* Element tbody */
-		$__v3 = $__v2->element("tbody");
-		
-		/* Element tr */
-		$__v4 = $__v3->element("tr");
-		
-		/* Element td */
-		$__v5 = $__v4->element("td", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_dialog__td", $componentHash))])));
-		$__v5->push($this->renderDialogContainer());
+		$__v1 = $__v0->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("dialog__container", $componentHash))])));
+		$__v1->push($this->renderHeader());
+		$__v1->push($this->renderContent());
+		$__v1->push($this->renderFooter());
 		
 		return $__v;
 	}
-	function getProps()
-	{
-		$styles = new \Runtime\Vector();
-		if ($this->model->width != "")
-		{
-			$styles->push("max-width: " . $this->model->width);
-		}
-		return new \Runtime\Map([
-			"style" => $styles->join(";"),
-		]);
-	}
+	var $model;
+	var $modal;
 	/**
-	 * On shadow click
+	 * Overlay click
 	 */
-	function onShadowClick()
+	function onOverlayClick()
 	{
-		if (!$this->model->modal)
+		if (!$this->modal)
 		{
 			$this->model->hide();
 		}
 	}
 	/**
-	 * On dialog click
+	 * Close button click
 	 */
-	function onDialogClick($e)
+	function onCloseClick()
 	{
-		if ($e->target->classList->contains("widget_dialog__td"))
-		{
-			$this->onShadowClick();
-		}
+		$this->model->hide();
 	}
 	/**
-	 * Updated
+	 * Update component
 	 */
-	function onUpdated()
+	function updated()
 	{
-		$elem = $document->documentElement;
-		$is_scroll_lock = $elem->classList->contains("scroll-lock");
+		$body = $document->getElementsByTagName("body")[0];
 		if ($this->model->is_open)
 		{
-			if (!$is_scroll_lock)
+			if (!$body->classList->contains("scroll-lock"))
 			{
-				$elem->classList->add("scroll-lock");
-				$this->nextTick(function ()
-				{
-					$dialog_box = $this->getRef("dialog_box");
-					$dialog_box->scrollTop = 0;
-				});
+				$body->classList->add("scroll-lock");
 			}
 		}
 		else
 		{
-			if ($is_scroll_lock)
+			if ($body->classList->contains("scroll-lock"))
 			{
-				$elem->classList->remove("scroll-lock");
+				$body->classList->remove("scroll-lock");
 			}
 		}
 	}
@@ -186,8 +155,10 @@ class Dialog extends \Runtime\Component
 	function _init()
 	{
 		parent::_init();
+		$this->model = null;
+		$this->modal = true;
 	}
-	static function getComponentStyle(){ return ".widget_dialog.h-a5bb{text-align: left}.widget_dialog__box.h-a5bb, .widget_dialog__shadow.h-a5bb{position: fixed;top: 0;left: 0;width: 100%;height: 100%;z-index: 1001}.widget_dialog__box.h-a5bb{overflow: auto;overflow-y: scroll;display: none}.widget_dialog--open.h-a5bb .widget_dialog__box{display: block}.widget_dialog__shadow.h-a5bb{background-color: #000;opacity: 0.2;overflow: hidden;display: none}.widget_dialog--open.h-a5bb .widget_dialog__shadow{display: block}.widget_dialog__wrap.h-a5bb{width: 100%;min-height: 100%}.widget_dialog__wrap.h-a5bb > tr > td{padding: 20px}.widget_dialog__container.h-a5bb{position: relative;padding: calc(var(--widget-space) * 3);background-color: white;border-radius: 4px;max-width: 600px;margin: calc(var(--widget-space) * 5) auto;width: auto;z-index: 1002;box-shadow: 2px 4px 10px 0px rgba(0,0,0,0.5);font-size: var(--widget-font-size)}.widget_dialog__title.h-a5bb{font-weight: bold;font-size: var(--widget-font-size-h2);text-align: left;margin: var(--widget-margin-h2);margin-top: 0}%(RowButtons)widget_dialog__buttons.h-a5bb{margin: var(--widget-margin-h2);margin-bottom: 0}%(RowButtons)widget_dialog__buttons.h-a5bb %(Button)widget_button{min-width: 70px}"; }
-	static function getRequiredComponents(){ return new \Runtime\Vector("Runtime.Widget.Button", "Runtime.Widget.RowButtons", "Runtime.Widget.WidgetResult"); }
+	static function getComponentStyle(){ return ".dialog.h-a5bb{display: none;position: fixed;top: 0;left: 0;width: 100%;height: 100%;background-color: rgba(0, 0, 0, 0.2);z-index: 99999;align-items: center;justify-content: center;overflow-y: auto}.dialog--open.h-a5bb{display: grid}.dialog__container.h-a5bb{background-color: var(--color-background);border-radius: var(--border-radius);box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);width: 600px;margin: calc(var(--space) * 2) auto}.dialog__content.h-a5bb{padding: calc(var(--space) * 2)}.dialog__header.h-a5bb{padding: var(--space) calc(var(--space) * 2);border-bottom: 1px solid var(--color-border);display: flex;justify-content: space-between;align-items: center;font-weight: bold;font-size: 1.2em}.dialog__header.h-a5bb .button{font-size: 1.5em;line-height: 0;border: none}.dialog__footer.h-a5bb{padding: calc(var(--space) * 2);padding-top: var(--space);display: flex;justify-content: flex-end;gap: var(--space)}@media (max-width: 768px){.dialog__content_wrapper.h-a5bb{width: 95%}.dialog__header.h-a5bb{font-size: 1.1em;padding: 10px 15px}.dialog__content.h-a5bb{padding: 15px}.dialog__footer.h-a5bb{padding: 10px 15px}}"; }
+	static function getRequiredComponents(){ return new \Runtime\Vector(); }
 	static function getClassName(){ return "Runtime.Widget.Dialog.Dialog"; }
 }

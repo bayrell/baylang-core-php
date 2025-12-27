@@ -19,45 +19,22 @@
 namespace Runtime\Web;
 
 use Runtime\BaseObject;
-use Runtime\Exceptions\AbstractException;
+use Runtime\Exceptions\ApiError;
+use Runtime\Exceptions\FieldException;
+use Runtime\Exceptions\RuntimeException;
+use Runtime\Serializer\BaseType;
+use Runtime\Serializer\MapType;
+use Runtime\Web\ApiRequest;
 use Runtime\Web\ApiResult;
-use Runtime\Web\BaseLayoutModel;
-use Runtime\Web\Cookie;
-use Runtime\Web\RenderContainer;
 
 
 class BaseApi extends \Runtime\BaseObject
 {
 	var $action;
-	var $post_data;
-	var $layout;
+	var $request;
 	var $result;
-	
-	
-	/**
-	 * Create hook
-	 */
-	function __construct($params = null)
-	{
-		parent::__construct();
-		/* Setup hook params */
-		$this->setup($params);
-	}
-	
-	
-	/**
-	 * Setup params
-	 */
-	function setup($params)
-	{
-		if ($params == null) return;
-	}
-	
-	
-	/**
-	 * Init api
-	 */
-	function init(){}
+	var $data;
+	var $storage;
 	
 	
 	/**
@@ -67,15 +44,56 @@ class BaseApi extends \Runtime\BaseObject
 	
 	
 	/**
-	 * Before route
+	 * Returns data rules
 	 */
-	function onActionBefore(){}
+	function getDataRules($rules){}
 	
 	
 	/**
-	 * After route
+	 * Set action
 	 */
-	function onActionAfter(){}
+	function setAction($action)
+	{
+		$this->action = $action;
+	}
+	
+	
+	/**
+	 * Set request
+	 */
+	function setRequest($request)
+	{
+		$this->request = $request;
+		$this->storage = $request->storage;
+	}
+	
+	
+	/**
+	 * Filter rules
+	 */
+	function filter($data, $rules, $error = new \Runtime\Vector())
+	{
+		$data = $rules->filter($data, $error);
+		if ($error->count() > 0)
+		{
+			throw new \Runtime\Exceptions\ApiError(new \Runtime\Exceptions\FieldException(new \Runtime\Map([
+				"error" => TypeError::getMessages($error),
+			])));
+		}
+		return $data;
+	}
+	
+	
+	/**
+	 * Filter data
+	 */
+	function filterData()
+	{
+		$errors = new \Runtime\Vector();
+		$rules = new \Runtime\Serializer\MapType();
+		$this->getDataRules($rules);
+		$this->data = $this->filter($this->request->data, $rules, $errors);
+	}
 	
 	
 	/**
@@ -83,7 +101,7 @@ class BaseApi extends \Runtime\BaseObject
 	 */
 	function success($data = null)
 	{
-		$this->result->success($data);
+		return $this->result->success($data);
 	}
 	
 	
@@ -92,7 +110,7 @@ class BaseApi extends \Runtime\BaseObject
 	 */
 	function exception($e)
 	{
-		$this->result->exception($e);
+		return $this->result->exception($e);
 	}
 	
 	
@@ -101,7 +119,7 @@ class BaseApi extends \Runtime\BaseObject
 	 */
 	function fail($data = null)
 	{
-		$this->result->fail($data);
+		return $this->result->fail($data);
 	}
 	
 	
@@ -110,9 +128,10 @@ class BaseApi extends \Runtime\BaseObject
 	{
 		parent::_init();
 		$this->action = "";
-		$this->post_data = null;
-		$this->layout = null;
-		$this->result = null;
+		$this->request = null;
+		$this->result = new \Runtime\Web\ApiResult();
+		$this->data = null;
+		$this->storage = null;
 	}
 	static function getClassName(){ return "Runtime.Web.BaseApi"; }
 	static function getMethodsList(){ return null; }

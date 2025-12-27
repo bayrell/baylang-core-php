@@ -18,12 +18,18 @@
  */
 namespace Runtime;
 
+use Runtime\ApiResult;
 use Runtime\BaseModel;
 use Runtime\BaseStorage;
+use Runtime\BusInterface;
 use Runtime\DefaultLayout;
 use Runtime\Method;
-use Runtime\Serializer;
 use Runtime\Hooks\RuntimeHook;
+use Runtime\Serializer\MapType;
+use Runtime\Serializer\ObjectType;
+use Runtime\Serializer\Serializer;
+use Runtime\Serializer\StringType;
+use Runtime\Serializer\VectorType;
 
 
 class BaseLayout extends \Runtime\BaseModel
@@ -72,26 +78,23 @@ class BaseLayout extends \Runtime\BaseModel
 	/**
 	 * Serialize object
 	 */
-	function serialize($serializer, $data)
+	static function serialize($rules)
 	{
-		parent::serialize($serializer, $data);
-		$serializer->process($this, "components", $data);
-		$serializer->process($this, "current_page_model", $data);
-		$serializer->process($this, "lang", $data);
-		$serializer->process($this, "theme", $data);
-		$serializer->process($this, "title", $data);
-		$serializer->process($this, "pages", $data, new \Runtime\Method($this, "serializePage"));
-		$serializer->process($this, "storage", $data);
-	}
-	
-	
-	/**
-	 * Serialize page
-	 */
-	function serializePage($serializer, $data)
-	{
-		$class_name = $data->get("__class_name__");
-		return $this->createWidget($class_name, $data);
+		parent::serialize($rules);
+		$rules->addType("components", new \Runtime\Serializer\VectorType(new \Runtime\Serializer\StringType()));
+		$rules->addType("current_page_model", new \Runtime\Serializer\StringType());
+		$rules->addType("lang", new \Runtime\Serializer\StringType());
+		$rules->addType("theme", new \Runtime\Serializer\StringType());
+		$rules->addType("title", new \Runtime\Serializer\StringType());
+		$rules->addType("storage", new \Runtime\Serializer\ObjectType(new \Runtime\Map(["class_name" => "Runtime.BaseStorage"])));
+		$rules->addType("pages", new \Runtime\Serializer\MapType(new \Runtime\Serializer\ObjectType(new \Runtime\Map([
+			"autocreate" => true,
+			"extends" => "Runtime.BaseModel",
+			"create" => function ($layout, $rules, $data)
+			{
+				return $layout->createWidget($rules->class_name, $data);
+			},
+		]))));
 	}
 	
 	
@@ -120,7 +123,6 @@ class BaseLayout extends \Runtime\BaseModel
 		$page = $this->pages->get($class_name);
 		if (!$page)
 		{
-			$params->set("widget_name", $class_name);
 			$page = $this->createWidget($class_name, $params);
 			$this->pages->set($class_name, $page);
 		}
@@ -146,7 +148,34 @@ class BaseLayout extends \Runtime\BaseModel
 	/**
 	 * Returns object
 	 */
-	function get($name){ return $this->storage->frontend_params->get($name); }
+	function get($name){ return $this->storage->frontend->get($name); }
+	
+	
+	/**
+	 * Returns site name
+	 */
+	function getSiteName(){ return ""; }
+	
+	
+	/**
+	 * Create url
+	 */
+	function url($name, $params = null)
+	{
+		$router = $this->get("router");
+		return $router->url($name, $params);
+	}
+	
+	
+	/**
+	 * Send api
+	 */
+	function sendApi($params)
+	{
+		$api = \Runtime\rtl::getContext()->provider("api");
+		$params->set("storage", $this->storage->backend);
+		return $api->send($params);
+	}
 	
 	
 	/**
@@ -184,7 +213,11 @@ class BaseLayout extends \Runtime\BaseModel
 	static function getRequiredComponents($component, $result, $hash)
 	{
 		if ($hash->has($component)) return;
-		$hash->set($component, true);
+		$components = \Runtime\rtl::getParents($component, "Runtime.Component")->filter(function ($class_name) use (&$hash){ return !$hash->has($class_name); });
+		$components->each(function ($class_name) use (&$hash)
+		{
+			$hash->set($class_name, true);
+		});
 		$f = new \Runtime\Method($component, "getRequiredComponents");
 		if ($f->exists())
 		{
@@ -198,7 +231,7 @@ class BaseLayout extends \Runtime\BaseModel
 				}
 			}
 		}
-		$result->push($component);
+		$result->appendItems($components);
 	}
 	
 	

@@ -25,6 +25,25 @@ use Runtime\Message;
 
 class Component extends \Runtime\BaseObject
 {
+	function renderWidget($model, $attrs = null)
+	{
+		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
+		$__v = new \Runtime\VirtualDom($this);
+		
+		if ($model)
+		{
+			$component = $model->component;
+			if (!$attrs)
+			{
+				$attrs = new \Runtime\Map();
+			}
+			
+			/* Element $component */
+			$__v->element($component, (new \Runtime\Map(["model" => $model]))->concat($attrs));
+		}
+		
+		return $__v;
+	}
 	function render()
 	{
 		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
@@ -44,12 +63,20 @@ class Component extends \Runtime\BaseObject
 	{
 	}
 	/**
+	 * Returns true if slot is exists
+	 */
+	function slot($name)
+	{
+		return $this->_slots->has($name);
+	}
+	/**
 	 * Render slot
 	 */
-	function renderSlot($slot_name)
+	function renderSlot($slot_name, $args = null)
 	{
 		$f = $this->_slots->get($slot_name);
-	return $f ? $f() : null;
+	if (!$f) return null;
+	return $args ? call_user_func_array($f, $args->toArray()) : $f();
 	}
 	/**
 	 * Returns parent
@@ -68,6 +95,12 @@ class Component extends \Runtime\BaseObject
 	 * Emit message
 	 */
 	function emit($message)
+	{
+	}
+	/**
+	 * Next tick
+	 */
+	function nextTick($f)
 	{
 	}
 	function __get($name)

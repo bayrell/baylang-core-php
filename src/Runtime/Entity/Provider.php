@@ -22,10 +22,31 @@ use Runtime\Entity\Factory;
 
 class Provider extends \Runtime\Entity\Factory
 {
+	/* Provider class name */
+	var $value;
+	
+	
+	/**
+	 * Create factory
+	 */
+	function __construct($name, $value = "", $params = null)
+	{
+		parent::__construct($name, $params);
+		$this->value = $value;
+	}
+	
+	
+	/**
+	 * Returns class name
+	 */
+	function getName(){ return $this->value ? $this->value : $this->name; }
+	
+	
 	/* ========= Class init functions ========= */
 	function _init()
 	{
 		parent::_init();
+		$this->value = null;
 	}
 	static function getClassName(){ return "Runtime.Entity.Provider"; }
 	static function getMethodsList(){ return null; }

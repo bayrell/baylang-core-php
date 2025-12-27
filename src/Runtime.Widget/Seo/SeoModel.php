@@ -20,7 +20,10 @@ namespace Runtime\Widget\Seo;
 
 use Runtime\BaseObject;
 use Runtime\BaseModel;
-use Runtime\Serializer;
+use Runtime\Serializer\MapType;
+use Runtime\Serializer\ObjectType;
+use Runtime\Serializer\StringType;
+use Runtime\Serializer\VectorType;
 use Runtime\Widget\Seo\SeoWidget;
 
 
@@ -38,28 +41,28 @@ class SeoModel extends \Runtime\BaseModel
 	
 	
 	/**
+	 * Process frontend data
+	 */
+	static function serialize($rules)
+	{
+		parent::serialize($rules);
+		$rules->addType("article_modified_time", new \Runtime\Serializer\StringType());
+		$rules->addType("article_published_time", new \Runtime\Serializer\StringType());
+		$rules->addType("canonical_url", new \Runtime\Serializer\StringType());
+		$rules->addType("description", new \Runtime\Serializer\StringType());
+		$rules->addType("favicon", new \Runtime\Serializer\StringType());
+		$rules->addType("robots", new \Runtime\Serializer\VectorType(new \Runtime\Serializer\StringType()));
+		$rules->addType("tags", new \Runtime\Serializer\VectorType(new \Runtime\Serializer\StringType()));
+	}
+	
+	
+	/**
 	 * Init widget params
 	 */
 	function initParams($params)
 	{
 		parent::initParams($params);
 		if ($params == null) return;
-	}
-	
-	
-	/**
-	 * Process frontend data
-	 */
-	function serialize($serializer, $data)
-	{
-		$serializer->process($this, "article_modified_time", $data);
-		$serializer->process($this, "article_published_time", $data);
-		$serializer->process($this, "canonical_url", $data);
-		$serializer->process($this, "description", $data);
-		$serializer->process($this, "favicon", $data);
-		$serializer->process($this, "robots", $data);
-		$serializer->process($this, "tags", $data);
-		parent::serialize($serializer, $data);
 	}
 	
 	

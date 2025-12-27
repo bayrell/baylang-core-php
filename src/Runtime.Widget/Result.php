@@ -28,7 +28,7 @@ class Result extends \Runtime\Component
 		$__v->is_render = true;
 		
 		/* Element div */
-		$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("result", $this->getErrorClass(), \Runtime\rs::mergeStyles("result", $this->styles), $componentHash))])));
+		$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("result", $this->class, $this->getErrorClass(), $componentHash))])));
 		$__v0->push($this->model->message);
 		
 		return $__v;
@@ -49,7 +49,7 @@ class Result extends \Runtime\Component
 	{
 		parent::_init();
 	}
-	static function getComponentStyle(){ return ".result.h-4c3d{text-align: center}.result--margin_top.h-4c3d{margin-top: var(--space)}.result--success.h-4c3d{color: var(--color-success)}.result--error.h-4c3d{color: var(--color-danger)}.result--hide.h-4c3d{display: none}"; }
+	static function getComponentStyle(){ return ".result--center.h-4c3d{text-align: center}.result--margin_top.h-4c3d, .result--margin_bottom.h-4c3d{margin-top: calc(var(--space) * 2)}.result--field.h-4c3d{margin-top: calc(var(--space) * 0.5)}.result--form.h-4c3d{text-align: center;margin-top: calc(var(--space) * 2);margin-bottom: calc(var(--space) * 2)}.result--form.h-4c3d:last-child{margin-bottom: 0}.result--success.h-4c3d{color: var(--color-success)}.result--error.h-4c3d{color: var(--color-danger)}.result--hide.h-4c3d{display: none}"; }
 	static function getRequiredComponents(){ return new \Runtime\Vector(); }
 	static function getClassName(){ return "Runtime.Widget.Result"; }
 }

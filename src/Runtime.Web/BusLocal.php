@@ -18,21 +18,23 @@
  */
 namespace Runtime\Web;
 
-use Runtime\lib;
+use Runtime\BaseObject;
 use Runtime\BaseProvider;
-use Runtime\Callback;
+use Runtime\BusInterface;
+use Runtime\Method;
 use Runtime\Exceptions\ApiError;
 use Runtime\Exceptions\ItemNotFound;
+use Runtime\Exceptions\RuntimeException;
 use Runtime\Web\ApiResult;
+use Runtime\Web\ApiRequest;
 use Runtime\Web\BaseApi;
 use Runtime\Web\Bus;
-use Runtime\Web\BusInterface;
 use Runtime\Web\Annotations\Api;
 use Runtime\Web\Annotations\ApiMethod;
 use Runtime\Web\Hooks\AppHook;
 
 
-class BusLocal extends \Runtime\BaseProvider implements \Runtime\Web\BusInterface
+class BusLocal extends \Runtime\BaseProvider implements \Runtime\BusInterface
 {
 	var $api_list;
 	
@@ -49,11 +51,56 @@ class BusLocal extends \Runtime\BaseProvider implements \Runtime\Web\BusInterfac
 		{
 			$api = $api_list->get($i);
 			$class_name = $api->name;
-			$getApiName = new \Runtime\Callback($class_name, "getApiName");
+			$getApiName = new \Runtime\Method($class_name, "getApiName");
 			/* Save api */
-			$api_name = \Runtime\rtl::apply($getApiName);
-			$this->api_list->set($api_name, $api);
+			$api_name = $getApiName->apply();
+			if (!$this->api_list->has($api_name)) $this->api_list->set($api_name, new \Runtime\Vector());
+			$items = $this->api_list->get($api_name);
+			$items->push($api);
 		}
+	}
+	
+	
+	/**
+	 * Find api
+	 */
+	function findApi($api_name, $method_name)
+	{
+		$result = new \Runtime\Map();
+		/* Check params */
+		if ($api_name == "" || $method_name == "")
+		{
+			throw new \Runtime\Exceptions\ApiError(new \Runtime\Exceptions\ItemNotFound($api_name . "::" . $method_name, "Api"));
+		}
+		/* Find api */
+		$items = $this->api_list->get($api_name);
+		if (!$items)
+		{
+			throw new \Runtime\Exceptions\ApiError(new \Runtime\Exceptions\ItemNotFound($api_name . "::" . $method_name, "Api"));
+		}
+		/* Find method */
+		$api_method = null;
+		$items->each(function ($api) use (&$api_method, &$method_name)
+		{
+			if ($api_method) return;
+			$getMethodsList = new \Runtime\Method($api->name, "getMethodsList");
+			$getMethodInfoByName = new \Runtime\Method($api->name, "getMethodInfoByName");
+			$methods = $getMethodsList->apply();
+			for ($i = 0; $i < $methods->count(); $i++)
+			{
+				$name = $methods->get($i);
+				$annotations = $getMethodInfoByName->apply(new \Runtime\Vector($name));
+				$api_method_item = $annotations->find(function ($obj){ return $obj instanceof \Runtime\Web\Annotations\ApiMethod; });
+				if ($api_method_item && $api_method_item->name == $method_name)
+				{
+					$api_item = \Runtime\rtl::newInstance($api->name);
+					$api_method = $api_method_item;
+					$api_method->item = new \Runtime\Method($api_item, $name);
+					return;
+				}
+			}
+		});
+		return $api_method;
 	}
 	
 	
@@ -64,99 +111,44 @@ class BusLocal extends \Runtime\BaseProvider implements \Runtime\Web\BusInterfac
 	{
 		$api_name = $params->get("api_name");
 		$method_name = $params->get("method_name");
-		/* Get api name */
-		$res = \Runtime\Web\Bus::parseName($api_name);
-		$api_name = $res->get("api_name");
-		/* Call local api */
+		$result = null;
 		try
 		{
-			$annotation = $this->findApi($params);
-			$result = $this->callAnnotation($annotation, $params);
+			$api_method = $this->findApi($api_name, $method_name);
+			if ($api_method == null || $api_method->item == null)
+			{
+				throw new \Runtime\Exceptions\ApiError(new \Runtime\Exceptions\ItemNotFound($api_name . "::" . $method_name, "Api"));
+			}
+			/* Call method */
+			$request = new \Runtime\Web\ApiRequest(new \Runtime\Map([
+				"data" => $params->get("data"),
+				"storage" => $params->get("storage"),
+			]));
+			$api_method->item->obj->setRequest($request);
+			$api_method->apply($request);
+			$result = $api_method->item->obj->result;
 		}
-		catch (\Runtime\Exceptions\ApiError $e)
+		catch (\Runtime\Exceptions\RuntimeException $e)
 		{
 			$result = new \Runtime\Web\ApiResult();
-			$result->fail($e->getPreviousException());
+			if ($e instanceof \Runtime\Exceptions\ApiError)
+			{
+				if ($e->result instanceof \Runtime\Web\ApiResult) $result = $e->result;
+				else $result->fail($e->prev);
+			}
+			else $result->exception($e);
+		}
+		/* If result does no exists */
+		if (!$result)
+		{
+			$result = new \Runtime\Web\ApiResult();
+			$result->exception(new \Runtime\Exceptions\ItemNotFound("ApiResult"));
 		}
 		/* Set api name */
 		$result->api_name = $api_name;
 		$result->method_name = $method_name;
+		/* Return result */
 		return $result;
-	}
-	
-	
-	/**
-	 * Find local api
-	 */
-	function findApi($params)
-	{
-		$api_name = $params->get("api_name");
-		$method_name = $params->get("method_name");
-		/* Get annotation by api name */
-		$annotation = $this->api_list->get($api_name);
-		/* Call find api hook */
-		$res = \Runtime\rtl::getContext()->callHook(\Runtime\Web\Hooks\AppHook::FIND_API, new \Runtime\Map([
-			"api_name" => $api_name,
-			"annotation" => $annotation,
-		]));
-		$annotation = $res->get("annotation");
-		/* Annotation not found */
-		if ($annotation == null)
-		{
-			throw new \Runtime\Exceptions\ApiError(new \Runtime\Exceptions\ItemNotFound($api_name, "Api annotation"));
-		}
-		/* Find method */
-		$getMethodInfoByName = new \Runtime\Callback($annotation->name, "getMethodInfoByName");
-		$method_info = $getMethodInfoByName->apply(new \Runtime\Vector($method_name));
-		/* Method not found */
-		if ($method_info == null)
-		{
-			throw new \Runtime\Exceptions\ApiError(new \Runtime\Exceptions\ItemNotFound($method_name . " in " . $api_name, "Api method"));
-		}
-		/* Check if method is api */
-		$api_method = $method_info->get("annotations")->findItem(\Runtime\lib::isInstance("Runtime.Web.Annotations.ApiMethod"));
-		if ($api_method == null)
-		{
-			throw new \Runtime\Exceptions\ApiError(new \Runtime\Exceptions\ItemNotFound($method_name . " in " . $api_name, "Api method"));
-		}
-		/* Set props */
-		$result = new \Runtime\Map([
-			"api" => $annotation,
-			"api_method" => $api_method,
-		]);
-		return $result;
-	}
-	
-	
-	/**
-	 * Call annotation
-	 */
-	function callAnnotation($annotation, $params)
-	{
-		$api = $annotation->get("api");
-		$method_name = $params->get("method_name");
-		/* Create api instance */
-		$api_instance = \Runtime\rtl::newInstance($api->name, new \Runtime\Vector($api->params));
-		$api_instance->action = $method_name;
-		$api_instance->layout = $params->get("layout");
-		$api_instance->post_data = $params->get("data");
-		$api_instance->result = new \Runtime\Web\ApiResult();
-		$api_instance->init();
-		/* Create callback */
-		$callback = new \Runtime\Callback($api_instance, $method_name);
-		/* Call api */
-		try
-		{
-			$api_instance->onActionBefore();
-			$callback->apply();
-			$api_instance->onActionAfter();
-		}
-		catch (\Runtime\Exceptions\ApiError $e)
-		{
-			$api_instance->result->fail($e->getPreviousException());
-		}
-		/* Return api result */
-		return $api_instance->result;
 	}
 	
 	

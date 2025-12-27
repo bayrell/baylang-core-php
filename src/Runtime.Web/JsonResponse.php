@@ -40,7 +40,7 @@ class JsonResponse extends \Runtime\Web\Response
 	 */
 	function getContent()
 	{
-		return \Runtime\rtl::json_encode($this->data, \Runtime\rtl::ALLOW_OBJECTS);
+		return \Runtime\rtl::jsonEncode($this->data);
 	}
 	
 	

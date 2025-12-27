@@ -19,6 +19,7 @@
 namespace Runtime;
 
 use Runtime\BaseObject;
+use Runtime\BaseModel;
 use Runtime\Component;
 use Runtime\Providers\RenderContent;
 
@@ -94,6 +95,7 @@ class VirtualDom extends \Runtime\BaseObject
 	 */
 	function push($content)
 	{
+		if (\Runtime\rtl::isString($content) && $content == "") return;
 		if (!($content instanceof \Runtime\VirtualDom) && !\Runtime\rtl::isString($content))
 		{
 			$content = \Runtime\rtl::toStr($content);
@@ -130,6 +132,30 @@ class VirtualDom extends \Runtime\BaseObject
 		$provider->components = \Runtime\rtl::getContext()->provider("render")->components;
 		$provider->render($this, $content);
 		return \Runtime\rs::join("", $content);
+	}
+	
+	
+	/**
+	 * Raw string
+	 */
+	static function raw($content)
+	{
+		$vdom = new \Runtime\VirtualDom();
+		$vdom->is_raw = true;
+		$vdom->push($content);
+		return $vdom;
+	}
+	
+	
+	/**
+	 * Render model
+	 */
+	static function renderModel($model)
+	{
+		$vdom = new \Runtime\VirtualDom();
+		$vdom->setName($model->component);
+		$vdom->attrs = new \Runtime\Map(["model" => $model, "layout" => $model->layout]);
+		return $vdom;
 	}
 	
 	

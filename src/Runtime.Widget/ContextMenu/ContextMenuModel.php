@@ -105,7 +105,7 @@ class ContextMenuModel extends \Runtime\BaseModel
 	 */
 	function onClickItem($item)
 	{
-		$this->emit(new \Runtime\Widget\ContextMenu\ContextMenuMessage(new \Runtime\Map([
+		$this->listener->emit(new \Runtime\Widget\ContextMenu\ContextMenuMessage(new \Runtime\Map([
 			"name" => "clickItem",
 			"item" => $item,
 		])));

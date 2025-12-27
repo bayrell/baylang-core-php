@@ -20,7 +20,9 @@ namespace Runtime\Web;
 
 use Runtime\BaseObject;
 use Runtime\SerializeInterface;
-use Runtime\Serializer;
+use Runtime\Serializer\MapType;
+use Runtime\Serializer\ObjectType;
+use Runtime\Serializer\StringType;
 use Runtime\Web\Hooks\AppHook;
 
 
@@ -33,11 +35,18 @@ class RouteList extends \Runtime\BaseObject implements \Runtime\SerializeInterfa
 	/**
 	 * Serialize
 	 */
-	function serialize($serializer, $data)
+	static function serialize($rules)
 	{
-		$serializer->process($this, "routes", $data);
-		$serializer->process($this, "route_params", $data);
+		parent::serialize($rules);
+		$rules->addType("routes", new \Runtime\Serializer\MapType(new \Runtime\Serializer\MapType(new \Runtime\Serializer\StringType())));
+		$rules->addType("route_params", new \Runtime\Serializer\MapType(new \Runtime\Serializer\StringType()));
 	}
+	
+	
+	/**
+	 * Assign rules
+	 */
+	function assignRules($rule){}
 	
 	
 	/**

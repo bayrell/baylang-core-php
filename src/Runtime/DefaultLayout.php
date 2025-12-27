@@ -94,11 +94,18 @@ class DefaultLayout extends \Runtime\Component
 		
 		$__v->push($this->renderComponents($this->getComponents(\Runtime\Hooks\RuntimeHook::LAYOUT_FOOTER)));
 		
+		return $__v;
+	}
+	function renderMountApp()
+	{
+		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
+		$__v = new \Runtime\VirtualDom($this);
+		
 		/* Element script */
 		$__v0 = $__v->element("script");
 		$__v0->push("var app_data =");
 		$__v0->push(\Runtime\rtl::jsonEncode($this->container->getData()));
-		$__v0->push(";\n\t\tRuntime.rtl.mount(app_data, document.querySelector(\".root_container\"), function (result){\n\t\t\twindow[\"app\"] = result.get(\"app\");\n\t\t\twindow[\"app_layout\"] = result.get(\"layout\");\n\t\t});");
+		$__v0->push(";\n\t\tdocument.addEventListener(\"DOMContentLoaded\", function(){\n\t\t\tRuntime.rtl.mount(app_data, document.querySelector(\".root_container\"), function (result){\n\t\t\t\twindow[\"app\"] = result.get(\"app\");\n\t\t\t\twindow[\"app_layout\"] = result.get(\"layout\");\n\t\t\t});\n\t\t});");
 		
 		return $__v;
 	}
@@ -133,6 +140,7 @@ class DefaultLayout extends \Runtime\Component
 		$__v3 = $__v2->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("root_container", $componentHash))])));
 		$__v3->push($this->render());
 		$__v2->push($this->renderFooter());
+		$__v2->push($this->renderMountApp());
 		
 		return $__v;
 	}

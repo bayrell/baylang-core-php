@@ -30,7 +30,7 @@ class Hook extends \Runtime\Entity\Factory
 	 */
 	function __construct($name, $params = null)
 	{
-		parent::__construct($name, null, $params);
+		parent::__construct($name, $params);
 	}
 	
 	

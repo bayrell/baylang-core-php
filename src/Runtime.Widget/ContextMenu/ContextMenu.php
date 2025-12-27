@@ -27,7 +27,7 @@ class ContextMenu extends \Runtime\Component
 		$__v = new \Runtime\VirtualDom($this);
 		
 		/* Element div */
-		$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_context_menu__item", $item->get("hidden") == true ? "hidden" : "", $componentHash))])));
+		$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("context_menu__item", $item->get("hidden") == true ? "hidden" : "", $componentHash))])));
 		$__v0->push($item->get("label"));
 		
 		return $__v;
@@ -41,7 +41,7 @@ class ContextMenu extends \Runtime\Component
 		$props = $this->getProps();
 		
 		/* Element div */
-		$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("widget_context_menu", $this->model->is_open ? "widget_context_menu--open" : "widget_context_menu--hide", $componentHash))]))->concat($props));
+		$__v0 = $__v->element("div", (new \Runtime\Map(["class" => \Runtime\rs::className(new \Runtime\Vector("context_menu", $this->model->is_open ? "context_menu--open" : "context_menu--hide", $componentHash))]))->concat($props));
 		
 		for ($i = 0; $i < $this->model->items->count(); $i++)
 		{
@@ -64,8 +64,15 @@ class ContextMenu extends \Runtime\Component
 		$styles->push("left: " . $this->model->x . "px;");
 		$styles->push("top: " . $this->model->y . "px;");
 		return new \Runtime\Map([
-			"style" => $styles->join(";"),
+			"style" => \Runtime\rs::join(";", $styles),
 		]);
+	}
+	/**
+	 * Click item
+	 */
+	function onClickItem($item)
+	{
+		$this->model->onClickItem($item);
 	}
 	
 	/* ========= Class init functions ========= */
@@ -73,7 +80,7 @@ class ContextMenu extends \Runtime\Component
 	{
 		parent::_init();
 	}
-	static function getComponentStyle(){ return ".widget_context_menu.h-eb02{display: none;position: absolute;z-index: 99;background-color: var(--widget-color-default);border: var(--widget-border-width) var(--widget-color-border) solid;border-bottom-width: 0}.widget_context_menu--open.h-eb02{display: block}.widget_context_menu__item.h-eb02{padding: var(--widget-button-padding-y) var(--widget-button-padding-y);border-bottom: var(--widget-border-width) var(--widget-color-border) solid;cursor: pointer;user-select: none}.widget_context_menu__item.hidden.h-eb02{display: none}"; }
+	static function getComponentStyle(){ return ".context_menu.h-eb02{display: none;position: absolute;z-index: 99;background-color: var(--color-background);border: var(--border-width) var(--color-border) solid;border-bottom-width: 0}.context_menu--open.h-eb02{display: block}.context_menu__item.h-eb02{padding: calc(var(--space) * 0.75) var(--space);border-bottom: var(--border-width) var(--color-border) solid;cursor: pointer;user-select: none}.context_menu__item.h-eb02:hover{background-color: var(--color-hover)}.context_menu__item.hidden.h-eb02{display: none}"; }
 	static function getRequiredComponents(){ return new \Runtime\Vector(); }
 	static function getClassName(){ return "Runtime.Widget.ContextMenu.ContextMenu"; }
 }

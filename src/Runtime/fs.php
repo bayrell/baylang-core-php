@@ -31,6 +31,7 @@ class fs
 	 */
 	static function join($arr)
 	{
+		$arr = $arr->filter(function ($s){ return $s != ""; });
 		$path = \Runtime\rs::join(static::DIRECTORY_SEPARATOR, $arr);
 		$path = \Runtime\re::replace("\\/+", "/", $path);
 		$path = \Runtime\re::replace("\\/\\.\\/", "/", $path);

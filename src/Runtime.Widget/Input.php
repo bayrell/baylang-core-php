@@ -94,7 +94,7 @@ class Input extends \Runtime\Widget\Field
 		$this->type = "text";
 		$this->change_timer = null;
 	}
-	static function getComponentStyle(){ return ".input.h-f2de{width: 100%;font-family: var(--font-family);font-size: var(--font-input-size);padding: calc(var(--space) * 0.75) calc(var(--space) * 1.5);background-color: var(--color-default);border-width: var(--border-width);border-color: var(--color-border);border-style: solid;border-radius: var(--border-radius);box-shadow: none;color: var(--text-color);outline: transparent;line-height: normal;min-height: 32px;transition: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.input.h-f2de:focus{outline: transparent}"; }
+	static function getComponentStyle(){ return ".input.h-f2de{width: 100%;font-family: var(--font-family);font-size: var(--font-input-size);padding: calc(var(--space) * 0.75) calc(var(--space) * 1.5);background-color: var(--color-background);border-width: var(--border-width);border-color: var(--color-border);border-style: solid;border-radius: var(--border-radius);box-shadow: none;color: var(--text-color);outline: transparent;line-height: normal;min-height: 32px;transition: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.input.h-f2de:focus{outline: transparent}"; }
 	static function getRequiredComponents(){ return new \Runtime\Vector(); }
 	static function getClassName(){ return "Runtime.Widget.Input"; }
 }
