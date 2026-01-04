@@ -37,7 +37,9 @@ class BaseLayout extends \Runtime\BaseModel
 	var $storage;
 	var $components;
 	var $pages;
+	var $component_props;
 	var $component;
+	var $current_component;
 	var $current_page_model;
 	var $name;
 	var $lang;
@@ -81,7 +83,9 @@ class BaseLayout extends \Runtime\BaseModel
 	static function serialize($rules)
 	{
 		parent::serialize($rules);
+		$rules->addType("component_props", new \Runtime\Serializer\StringType());
 		$rules->addType("components", new \Runtime\Serializer\VectorType(new \Runtime\Serializer\StringType()));
+		$rules->addType("current_component", new \Runtime\Serializer\StringType());
 		$rules->addType("current_page_model", new \Runtime\Serializer\StringType());
 		$rules->addType("lang", new \Runtime\Serializer\StringType());
 		$rules->addType("theme", new \Runtime\Serializer\StringType());
@@ -127,6 +131,16 @@ class BaseLayout extends \Runtime\BaseModel
 			$this->pages->set($class_name, $page);
 		}
 		return $page;
+	}
+	
+	
+	/**
+	 * Set current page
+	 */
+	function setCurrentPage($component_name, $props = null)
+	{
+		$this->current_component = $component_name;
+		$this->component_props = $props;
 	}
 	
 	
@@ -258,10 +272,9 @@ class BaseLayout extends \Runtime\BaseModel
 	/**
 	 * Returns style
 	 */
-	function getStyle()
+	static function getStyle($components)
 	{
 		$content = new \Runtime\Vector();
-		$components = $this->getComponents();
 		for ($i = 0; $i < $components->count(); $i++)
 		{
 			$class_name = $components->get($i);
@@ -280,7 +293,9 @@ class BaseLayout extends \Runtime\BaseModel
 		$this->storage = null;
 		$this->components = new \Runtime\Vector();
 		$this->pages = new \Runtime\Map();
+		$this->component_props = new \Runtime\Map();
 		$this->component = "Runtime.DefaultLayout";
+		$this->current_component = "";
 		$this->current_page_model = "";
 		$this->name = "";
 		$this->lang = "en";

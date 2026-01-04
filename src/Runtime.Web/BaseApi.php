@@ -24,8 +24,10 @@ use Runtime\Exceptions\FieldException;
 use Runtime\Exceptions\RuntimeException;
 use Runtime\Serializer\BaseType;
 use Runtime\Serializer\MapType;
+use Runtime\Serializer\TypeError;
 use Runtime\Web\ApiRequest;
 use Runtime\Web\ApiResult;
+use Runtime\Web\Middleware;
 
 
 class BaseApi extends \Runtime\BaseObject
@@ -47,6 +49,12 @@ class BaseApi extends \Runtime\BaseObject
 	 * Returns data rules
 	 */
 	function getDataRules($rules){}
+	
+	
+	/**
+	 * Returns middleware
+	 */
+	function getMiddleware(){ return new \Runtime\Vector(); }
 	
 	
 	/**
@@ -77,7 +85,7 @@ class BaseApi extends \Runtime\BaseObject
 		if ($error->count() > 0)
 		{
 			throw new \Runtime\Exceptions\ApiError(new \Runtime\Exceptions\FieldException(new \Runtime\Map([
-				"error" => TypeError::getMessages($error),
+				"error" => \Runtime\Serializer\TypeError::getMap($error),
 			])));
 		}
 		return $data;

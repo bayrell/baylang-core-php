@@ -22,7 +22,7 @@ use Runtime\BaseObject;
 use Runtime\Widget\Api\Rules\BaseRule;
 
 
-class ReadOnlyRule extends \Runtime\BaseObject implements \Runtime\Widget\Api\Rules\BaseRule
+class ReadOnlyRule extends \Runtime\Widget\Api\Rules\BaseRule
 {
 	var $field_name;
 	
@@ -44,6 +44,7 @@ class ReadOnlyRule extends \Runtime\BaseObject implements \Runtime\Widget\Api\Ru
 	{
 		if (!$data->has($this->field_name)) return;
 		$data->remove($this->field_name);
+		return $data;
 	}
 	
 	

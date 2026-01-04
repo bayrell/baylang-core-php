@@ -3319,7 +3319,9 @@ Runtime.BaseLayout = class extends Runtime.BaseModel
 	static serialize(rules)
 	{
 		super.serialize(rules);
+		rules.addType("component_props", new Runtime.Serializer.StringType());
 		rules.addType("components", new Runtime.Serializer.VectorType(new Runtime.Serializer.StringType()));
+		rules.addType("current_component", new Runtime.Serializer.StringType());
 		rules.addType("current_page_model", new Runtime.Serializer.StringType());
 		rules.addType("lang", new Runtime.Serializer.StringType());
 		rules.addType("theme", new Runtime.Serializer.StringType());
@@ -3366,6 +3368,17 @@ Runtime.BaseLayout = class extends Runtime.BaseModel
 			this.pages.set(class_name, page);
 		}
 		return page;
+	}
+	
+	
+	/**
+	 * Set current page
+	 */
+	setCurrentPage(component_name, props)
+	{
+		if (props == undefined) props = null;
+		this.current_component = component_name;
+		this.component_props = props;
 	}
 	
 	
@@ -3499,10 +3512,9 @@ Runtime.BaseLayout = class extends Runtime.BaseModel
 	/**
 	 * Returns style
 	 */
-	getStyle()
+	static getStyle(components)
 	{
 		let content = Runtime.Vector.create([]);
-		let components = this.getComponents();
 		for (let i = 0; i < components.count(); i++)
 		{
 			let class_name = components.get(i);
@@ -3521,7 +3533,9 @@ Runtime.BaseLayout = class extends Runtime.BaseModel
 		this.storage = null;
 		this.components = Runtime.Vector.create([]);
 		this.pages = new Runtime.Map();
+		this.component_props = new Runtime.Map();
 		this.component = "Runtime.DefaultLayout";
+		this.current_component = "";
 		this.current_page_model = "";
 		this.name = "";
 		this.lang = "en";
@@ -4179,6 +4193,150 @@ window["Runtime.ChainAsync"] = Runtime.ChainAsync;
  *
 */
 if (typeof Runtime == 'undefined') Runtime = {};
+Runtime.ClearLayout = {
+	name: "Runtime.ClearLayout",
+	extends: Runtime.Component,
+	methods:
+	{
+		renderHeader: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element title */
+			let __v0 = __v.element("title");
+			__v0.push(this.layout.title);
+			
+			/* Element meta */
+			__v.element("meta", new Runtime.Map({"name": "viewport", "content": "width=device-width, initial-scale=1.0"}));
+			
+			return __v;
+		},
+		renderStyle: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			let style = Runtime.BaseLayout.getStyle(this.getComponents());
+			if (style)
+			{
+				/* Element style */
+				let __v0 = __v.element("style");
+				__v0.push(style);
+			}
+			
+			return __v;
+		},
+		renderFooter: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			return __v;
+		},
+		renderCurrentPage: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			if (this.layout.current_component != "")
+			{
+				let component = this.layout.current_component;
+				
+				/* Element component */
+				__v.element(component, new Runtime.Map({}).concat(this.layout.component_props));
+			}
+			else
+			{
+				let model = this.layout.getPageModel();
+				let class_name = model ? model.component : "";
+				if (class_name)
+				{
+					/* Element class_name */
+					__v.element(class_name, new Runtime.Map({"model": model}));
+				}
+			}
+			
+			return __v;
+		},
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			__v.push(this.renderCurrentPage());
+			
+			return __v;
+		},
+		renderApp: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element html */
+			let __v0 = __v.element("html", new Runtime.Map({"lang": this.layout.lang}));
+			
+			/* Element head */
+			let __v1 = __v0.element("head");
+			__v1.push(this.renderHeader());
+			__v1.push(this.renderStyle());
+			
+			/* Element body */
+			let __v2 = __v0.element("body", new Runtime.Map({"class": rs.className(["theme_" + String(this.layout.theme), componentHash])}));
+			
+			/* Element div */
+			let __v3 = __v2.element("div", new Runtime.Map({"class": rs.className(["root_container", componentHash])}));
+			__v3.push(this.render());
+			__v2.push(this.renderFooter());
+			
+			return __v;
+		},
+		/**
+		 * Returns layout components
+		 */
+		getComponents: function()
+		{
+			let hash = new Runtime.Map();
+			let result_components = Runtime.Vector.create([]);
+			let components = this.layout.components.slice();
+			for (let i = 0; i < components.count(); i++)
+			{
+				let class_name = components.get(i);
+				Runtime.BaseLayout.getRequiredComponents(class_name, result_components, hash);
+			}
+			return components;
+		},
+		getClassName: function(){ return "Runtime.ClearLayout"; },
+	},
+	getComponentStyle: function(){ return ""; },
+	getRequiredComponents: function(){ return new Runtime.Vector(); },
+};
+window["Runtime.ClearLayout"] = Runtime.ClearLayout;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2025 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
 Runtime.Component = {
 	name: "Runtime.Component",
 	props: {
@@ -4732,6 +4890,10 @@ Object.assign(Runtime.Curl.prototype,
 	 */
 	buildPostData: function(result, key, value)
 	{
+		if (Runtime.rtl.isImplements(value, "Runtime.SerializeInterface"))
+		{
+			value = Runtime.rtl.serialize(value);
+		}
 		if (value instanceof Array)
 		{
 			for (var i=0; i<value.length; i++)
@@ -5221,12 +5383,22 @@ Runtime.DefaultLayout = {
 			const componentHash = rs.getComponentHash(this.getClassName());
 			let __v = new Runtime.VirtualDom(this);
 			
-			let model = this.layout.getPageModel();
-			let class_name = model ? model.component : "";
-			if (class_name)
+			if (this.layout.current_component != "")
 			{
-				/* Element class_name */
-				__v.element(class_name, new Runtime.Map({"model": model}));
+				let component = this.layout.current_component;
+				
+				/* Element component */
+				__v.element(component, new Runtime.Map({}).concat(this.layout.component_props));
+			}
+			else
+			{
+				let model = this.layout.getPageModel();
+				let class_name = model ? model.component : "";
+				if (class_name)
+				{
+					/* Element class_name */
+					__v.element(class_name, new Runtime.Map({"model": model}));
+				}
 			}
 			
 			return __v;
@@ -5311,7 +5483,7 @@ Runtime.DefaultLayout = {
 			
 			/* Element style */
 			let __v0 = __v.element("style");
-			__v0.push(this.layout.getStyle());
+			__v0.push(Runtime.BaseLayout.getStyle(this.layout.getComponents()));
 			
 			return __v;
 		},
@@ -7113,8 +7285,8 @@ Runtime.Serializer.BooleanType = class extends Runtime.BaseObject
 			if (value == 1) return true;
 			return false;
 		}
-		if (value == "true") return true;
-		if (value == "false") return false;
+		if (value == "true" || value == "1") return true;
+		if (value == "false" || value == "0") return false;
 		errors.push(new Runtime.Serializer.TypeError("Does not boolean"));
 		return false;
 	}
@@ -7615,6 +7787,7 @@ Runtime.Serializer.ObjectType = class extends Runtime.Serializer.MapType
 		if (old_value == undefined) old_value = null;
 		if (prev == undefined) prev = null;
 		if (value == null) return null;
+		if (Runtime.rtl.isImplements(value, "Runtime.SerializeInterface")) return value;
 		let new_value = old_value;
 		if (!new_value)
 		{
@@ -9033,7 +9206,7 @@ if (typeof Runtime.Web.Hooks == 'undefined') Runtime.Web.Hooks = {};
 Runtime.Web.Hooks.AppHook = class extends Runtime.Hooks.BaseHook
 {
 	static ASSETS = "runtime.web.app::assets";
-	static CALL_API_BEFORE = "runtime.web.app::call_api_before";
+	static API_MIDDLEWARE = "runtime.web.app::api_middleware";
 	static CLIENT_IP = "runtime.web.app::client_ip";
 	static FIND_API = "runtime.web.app::find_api";
 	static FIND_ROUTE_BEFORE = "runtime.web.app::find_route_before";
@@ -9875,7 +10048,7 @@ Runtime.Widget.CSS = {
 	{
 		getClassName: function(){ return "Runtime.Widget.CSS"; },
 	},
-	getComponentStyle: function(){ return ":root{--font-family: 'Arial', sans-serif;--font-size: 16px;--font-size-h1: 2.2rem;--font-size-h2: 1.8rem;--font-size-h3: 1.5rem;--font-size-h4: 1.2rem;--font-size-h5: 1rem;--font-size-h6: 1rem;--font-input-size: 16px;--line-height: 1.6;--space: 0.5rem;--color-background: #ffffff;--color-surface: #f8f9fa;--color-border: #e0e1e6;--color-shadow: rgba(0, 0, 0, 0.1);--color-primary: #337ab7;--color-primary-border: #337ab7;--color-primary-hover: #2563eb;--color-primary-text: #ffffff;--color-secondary: #6c757d;--color-secondary-border: #6c757d;--color-secondary-hover: #545b62;--color-secondary-text: #ffffff;--color-success: #198754;--color-success-border: #198754;--color-success-hover: #1e7e34;--color-success-text: #ffffff;--color-danger: #dc3545;--color-danger-danger: #dc3545;--color-danger-hover: #c82333;--color-danger-text: #ffffff;--color-warning: #fbbf24;--color-warning-border: #fbbf24;--color-warning-hover: #e0a800;--color-warinng-text: #212529;--color-info: #60a5fa;--color-info-border: #60a5fa;--color-info-hover: #117a8b;--color-info-text: #ffffff;--color-text: #212529;--color-text-secondary: #6c757d;--color-heading-text: #343a40;--color-link: var(--color-primary);--color-link-hover: var(--color-primary-dark);--color-hover: rgba(0, 0, 0, 0.05);--color-selected: var(--color-primary);--color-selected-text: #ffffff;--border-radius: 6px;--border-radius-large: 12px;--border-width: 1px;--shadow-small: 0 1px 2px 0 rgba(0, 0, 0, 0.05);--shadow-medium: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);--shadow-large: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);--transition: 0.3s;--transition-type: ease-in-out;--transition-background: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type);--content-max-width: 1280px;--content-tablet-width: 1024px;--content-mobile-width: 768px;--padding-desktop: 2rem;--padding-tablet: 1.5rem;--padding-mobile: 1rem}.theme_dark{--color-background: #1a202c;--color-surface: #2d3748;--color-border: #4a5568;--color-shadow: rgba(0, 0, 0, 0.3);--color-primary: #63b3ed;--color-primary-light: #90cdf4;--color-primary-dark: #4299e1;--color-primary-text: #ffffff;--color-secondary: #a0aec0;--color-secondary-light: #1a202c;--color-secondary-dark: #cbd5e0;--color-secondary-text: #718096;--color-success: #68d391;--color-success-light: #5cb870;--color-success-dark: #1e7e34;--color-success-text: #ffffff;--color-danger: #fc8181;--color-danger-light: #e4606d;--color-danger-dark: #c82333;--color-danger-text: #ffffff;--color-warning: #f6e05e;--color-warning-light: #ffcd38;--color-warning-dark: #e0a800;--color-warinng-text: #212529;--color-info: #63b3ed;--color-info-light: #4bd2e3;--color-info-dark: #117a8b;--color-info-text: #ffffff;--color-text: #e2e8f0;--color-text-secondary: #a0aec0;--color-heading-text: #ffffff;--color-link: var(--color-primary);--color-link-hover: var(--color-primary-light)}body, html{scroll-behavior: smooth;transition: background-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.root_container{font-family: var(--font-family);font-size: var(--font-size);line-height: var(--line-height);box-sizing: border-box;width: 100%;padding: 0;margin: 0}.root_container *{box-sizing: border-box}.root_container h1, .root_container h2, .root_container h3, .root_container h4, .root_container h5, .root_container h6{font-family: var(--font-family);color: var(--color-heading-text);margin-top: calc(var(--space) * 3);margin-bottom: var(--space);line-height: 1.2;transition: background-color var(--transition) ease,\n\t\tcolor var(--transition) ease}.root_container h1{font-size: var(--font-size-h1);margin-top: 0}.root_container h2{font-size: var(--font-size-h2)}.root_container h3{font-size: var(--font-size-h3)}.root_container h4{font-size: var(--font-size-h4)}.root_container h5{font-size: var(--font-size-h5)}.root_container h6{font-size: var(--font-size-h6)}.root_container p{margin-bottom: 1em;transition: background-color var(--transition) ease,\n\t\tcolor var(--transition) ease}.link{text-decoration: none;color: var(--color-link);cursor: pointer}.link:hover, .link:visited:hover{text-decoration: underline;color: red}.link:visited{text-decoration: none;color: var(--color-link)}.nolink{text-decoration: inherit;color: inherit}.nolink:hover, .nolink:visited, .nolink:visited:hover{text-decoration: inherit;color: inherit}.cursor{cursor: pointer}.nowrap{white-space: nowrap}.bold{font-weight: bold}.nobold{font-weight: normal}.underline{text-decoration: underline}.center{text-align: center}.left{text-align: left}.right{text-align: right}.clear{clear: both}.hidden{display: none}.inline-block{display: inline-block}.scroll-lock{overflow: hidden}.scroll-lock .core_ui_root{padding-right: 15px}"; },
+	getComponentStyle: function(){ return ":root{--font-family: 'Arial', sans-serif;--font-size: 16px;--font-size-h1: 2.2rem;--font-size-h2: 1.8rem;--font-size-h3: 1.5rem;--font-size-h4: 1.2rem;--font-size-h5: 1rem;--font-size-h6: 1rem;--font-input-size: 16px;--line-height: 1.6;--space: 0.5rem;--color-background: #ffffff;--color-surface: #f8f9fa;--color-border: #e0e1e6;--color-shadow: rgba(0, 0, 0, 0.1);--color-primary: #337ab7;--color-primary-border: #337ab7;--color-primary-hover: #2563eb;--color-primary-text: #ffffff;--color-secondary: #6c757d;--color-secondary-border: #6c757d;--color-secondary-hover: #545b62;--color-secondary-text: #ffffff;--color-success: #198754;--color-success-border: #198754;--color-success-hover: #1e7e34;--color-success-text: #ffffff;--color-danger: #dc3545;--color-danger-danger: #dc3545;--color-danger-hover: #c82333;--color-danger-text: #ffffff;--color-warning: #fbbf24;--color-warning-border: #fbbf24;--color-warning-hover: #e0a800;--color-warinng-text: #212529;--color-info: #60a5fa;--color-info-border: #60a5fa;--color-info-hover: #117a8b;--color-info-text: #ffffff;--color-text: #212529;--color-text-secondary: #6c757d;--color-heading-text: #343a40;--color-link: var(--color-primary);--color-link-hover: var(--color-primary-dark);--color-hover: rgba(0, 0, 0, 0.05);--color-selected: var(--color-primary);--color-selected-text: #ffffff;--border-radius: 6px;--border-radius-large: 12px;--border-width: 1px;--shadow-small: 0 1px 2px 0 rgba(0, 0, 0, 0.05);--shadow-medium: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);--shadow-large: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);--transition: 0.3s;--transition-type: ease-in-out;--transition-background: background-color var(--transition) var(--transition-type),\n\t\tborder-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type);--content-max-width: 1280px;--content-tablet-width: 1024px;--content-mobile-width: 768px;--padding-desktop: 2rem;--padding-tablet: 1.5rem;--padding-mobile: 1rem}.theme_dark{--color-background: #1a202c;--color-surface: #2d3748;--color-border: #4a5568;--color-shadow: rgba(0, 0, 0, 0.3);--color-primary: #63b3ed;--color-primary-light: #90cdf4;--color-primary-dark: #4299e1;--color-primary-text: #ffffff;--color-secondary: #a0aec0;--color-secondary-light: #1a202c;--color-secondary-dark: #cbd5e0;--color-secondary-text: #718096;--color-success: #68d391;--color-success-light: #5cb870;--color-success-dark: #1e7e34;--color-success-text: #ffffff;--color-danger: #fc8181;--color-danger-light: #e4606d;--color-danger-dark: #c82333;--color-danger-text: #ffffff;--color-warning: #f6e05e;--color-warning-light: #ffcd38;--color-warning-dark: #e0a800;--color-warinng-text: #212529;--color-info: #63b3ed;--color-info-light: #4bd2e3;--color-info-dark: #117a8b;--color-info-text: #ffffff;--color-text: #e2e8f0;--color-text-secondary: #a0aec0;--color-heading-text: #ffffff;--color-link: var(--color-primary);--color-link-hover: red}body, html{scroll-behavior: smooth;transition: background-color var(--transition) var(--transition-type),\n\t\tcolor var(--transition) var(--transition-type)}.root_container{font-family: var(--font-family);font-size: var(--font-size);line-height: var(--line-height);box-sizing: border-box;width: 100%;padding: 0;margin: 0}.root_container *{box-sizing: border-box}.root_container h1, .root_container h2, .root_container h3, .root_container h4, .root_container h5, .root_container h6{font-family: var(--font-family);color: var(--color-heading-text);margin-top: calc(var(--space) * 3);margin-bottom: var(--space);line-height: 1.2;transition: background-color var(--transition) ease,\n\t\tcolor var(--transition) ease}.root_container h1{font-size: var(--font-size-h1);margin-top: 0}.root_container h2{font-size: var(--font-size-h2)}.root_container h3{font-size: var(--font-size-h3)}.root_container h4{font-size: var(--font-size-h4)}.root_container h5{font-size: var(--font-size-h5)}.root_container h6{font-size: var(--font-size-h6)}.root_container p{margin-bottom: 1em;transition: background-color var(--transition) ease,\n\t\tcolor var(--transition) ease}.link{text-decoration: none;color: var(--color-link);cursor: pointer}.link:hover, .link:visited:hover{text-decoration: underline;color: var(--color-link-hover)}.link:visited{text-decoration: none;color: var(--color-link)}.nolink{text-decoration: inherit;color: inherit}.nolink:hover, .nolink:visited, .nolink:visited:hover{text-decoration: inherit;color: inherit}.cursor{cursor: pointer}.nowrap{white-space: nowrap}.bold{font-weight: bold}.nobold{font-weight: normal}.underline{text-decoration: underline}.center{text-align: center}.left{text-align: left}.right{text-align: right}.clear{clear: both}.hidden{display: none}.inline-block{display: inline-block}.scroll-lock{overflow: hidden}.scroll-lock .core_ui_root{padding-right: 15px}"; },
 	getRequiredComponents: function(){ return new Runtime.Vector(); },
 };
 window["Runtime.Widget.CSS"] = Runtime.Widget.CSS;
@@ -10921,6 +11094,606 @@ Runtime.Widget.Select = {
 	getRequiredComponents: function(){ return new Runtime.Vector(); },
 };
 window["Runtime.Widget.Select"] = Runtime.Widget.Select;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2024 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+Runtime.Widget.SelectLabel = {
+	name: "Runtime.Widget.SelectLabel",
+	extends: Runtime.Component,
+	props: {
+		value: {default: ""},
+		options: {default: new Runtime.Vector()},
+	},
+	methods:
+	{
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element span */
+			let __v0 = __v.element("span", new Runtime.Map({"class": rs.className(["widget_select_label", componentHash])}));
+			
+			var item = this.options ? this.options.findItem((item) => { return item.get("key") == this.value; }) : null;
+			__v0.push(item != null ? item.get("value") : this.value);
+			
+			return __v;
+		},
+		getClassName: function(){ return "Runtime.Widget.SelectLabel"; },
+	},
+	getComponentStyle: function(){ return ""; },
+	getRequiredComponents: function(){ return new Runtime.Vector(); },
+};
+window["Runtime.Widget.SelectLabel"] = Runtime.Widget.SelectLabel;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2024 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+Runtime.Widget.SortableList = {
+	name: "Runtime.Widget.SortableList",
+	extends: Runtime.Component,
+	props: {
+		show_buttons: {default: "true"},
+		name: {default: ""},
+		value: {default: new Runtime.Vector()},
+	},
+	data: function()
+	{
+		return {
+			old_value: new Runtime.Vector(),
+			is_drag: false,
+			is_transition: false,
+			drag_elem: null,
+			drag_item: null,
+			drag_item_pos: -1,
+			shadow_elem: null,
+			drag_elem_css: null,
+			drag_start_point: null,
+			duration: 300,
+		};
+	},
+	methods:
+	{
+		renderValue: function(pos, item)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element Runtime.Widget.Input */
+			__v.element(Runtime.Widget.Input, new Runtime.Map({"value": item, "key": item, "onValueChange": this.hash(0) ? this.hash(0) : this.hash(0, (message) =>
+			{
+				var items = this.getItems();
+				items.set(pos, message.value);
+				this.onValueChange();
+			})}));
+			
+			return __v;
+		},
+		renderItem: function(pos)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			var item = this.getItems().get(pos);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item", componentHash]), "data-pos": pos, "key": item}));
+			
+			/* Element div */
+			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_drag", componentHash]), "onMousedown": this.hash(1) ? this.hash(1) : this.hash(1, (e) =>
+			{
+				this.onMouseDown(e, item);
+			})}));
+			__v1.push("@raw");
+			__v1.push("&#9776;");
+			
+			/* Element div */
+			let __v2 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_value", componentHash])}));
+			__v2.push(this.renderValue(pos, item));
+			
+			/* Element div */
+			let __v3 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_remove", componentHash]), "onClick": this.hash(2) ? this.hash(2) : this.hash(2, (e) =>
+			{
+				this.removeItem(pos);
+			})}));
+			__v3.push("@raw");
+			__v3.push("&#10005;");
+			
+			return __v;
+		},
+		renderItems: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__items", componentHash])}));
+			
+			var items = this.getItems();
+			if (items)
+			{
+				/* Element TransitionGroup */
+				let __v1 = __v0.element(TransitionGroup, new Runtime.Map({"name": "widget_sortable_list"}));
+				
+				/* Content */
+				__v1.slot("default", () =>
+				{
+					const rs = use("Runtime.rs");
+					const componentHash = rs.getComponentHash(this.getClassName());
+					let __v = new Runtime.VirtualDom(this);
+					
+					for (var i = 0; i < items.count(); i++)
+					{
+						__v.push(this.renderItem(i));
+					}
+					
+					return __v;
+				});
+			}
+			
+			return __v;
+		},
+		renderButtons: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			if (this.show_buttons == "true")
+			{
+				/* Element div */
+				let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__buttons", componentHash])}));
+				
+				/* Element Runtime.Widget.Button */
+				let __v1 = __v0.element(Runtime.Widget.Button, new Runtime.Map({"styles": new Runtime.Vector("small"), "onClick": this.hash(3) ? this.hash(3) : this.hash(3, (event) =>
+				{
+					this.onAddItemClick();
+				})}));
+				
+				/* Content */
+				__v1.slot("default", () =>
+				{
+					const rs = use("Runtime.rs");
+					const componentHash = rs.getComponentHash(this.getClassName());
+					let __v = new Runtime.VirtualDom(this);
+					__v.push("Add");
+					return __v;
+				});
+			}
+			
+			return __v;
+		},
+		render: function()
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list", componentHash])}));
+			__v0.push(this.renderItems());
+			__v0.push(this.renderButtons());
+			
+			/* Element div */
+			__v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__shadow", componentHash]), "@ref": "shadow"}));
+			
+			return __v;
+		},
+		/**
+		 * Returns items
+		 */
+		getItems: function(){ return this.value; },
+		/**
+		 * Create new item
+		 */
+		createItem: function(){ return ""; },
+		/**
+		 * Create value
+		 */
+		createValue: function(){ return new Runtime.Vector(); },
+		/**
+		 * Swap items
+		 */
+		swapItems: function(a, b)
+		{
+			if (a > b)
+			{
+				var c = a;
+				a = b;
+				b = c;
+			}
+			var items = this.getItems();
+			var obj_a = items.get(a);
+			var obj_b = items.get(b);
+			items.remove(b);
+			items.insert(b, obj_a);
+			items.remove(a);
+			items.insert(a, obj_b);
+		},
+		/**
+		 * Remove item
+		 */
+		removeItem: function(pos)
+		{
+			var items = this.getItems();
+			this.old_value = Runtime.Serializer.copy(this.value);
+			items.remove(pos);
+			this.onValueChange();
+		},
+		/**
+		 * Returns drag & drop element from point
+		 */
+		getDragElementFromPoint: function(x, y)
+		{
+			var items = document.elementsFromPoint(x, y);
+			for (var i = 0; i < items.length; i++)
+			{
+				var elem = items[i];
+				if (elem.parentElement == this.shadow_elem) continue;
+				if (elem.classList.contains("widget_sortable_list__item")) return elem;
+			}
+			return null;
+		},
+		/**
+		 * Returns drag & drop element
+		 */
+		getDragElement: function(elem)
+		{
+			if (elem.classList.contains("widget_sortable_list__item")) return elem;
+			if (elem.parentElement.classList.contains("widget_sortable_list__item"))
+			{
+				return elem.parentElement;
+			}
+			return null;
+		},
+		/**
+		 * Create shadow elem
+		 */
+		createShadow: function()
+		{
+			if (!this.drag_elem) return;
+			this.shadow_elem = document.createElement("div");
+			this.shadow_elem.innerHTML = this.drag_elem.outerHTML;
+			this.shadow_elem.classList.add("widget_sortable_list__shadow_elem");
+			var arr = Runtime.rs.split(" ", this.constructor.getCssHash(this.constructor.getClassName()));
+			arr = arr.filter(Runtime.lib.equalNot(""));
+			for (var i = 0; i < arr.count(); i++)
+			{
+				this.shadow_elem.classList.add(arr.get(i));
+			}
+			this.shadow_elem.style.height = this.drag_elem.offsetHeight + String("px");
+			this.shadow_elem.style.width = this.drag_elem.offsetWidth + String("px");
+			this.getRef("shadow").appendChild(this.shadow_elem);
+		},
+		/**
+		 * Move shadow element
+		 */
+		moveShadow: function(x, y)
+		{
+			if (!this.shadow_elem) return;
+			var left = x - this.drag_start_point.get("shift_x");
+			var top = y - this.drag_start_point.get("shift_y");
+			this.shadow_elem.style.left = left + String("px");
+			this.shadow_elem.style.top = top + String("px");
+		},
+		/**
+		 * Start Drag & Drop
+		 */
+		startDrag: function(e)
+		{
+			if (this.is_drag != false) return false;
+			if (this.drag_start_point == null) return false;
+			/* Check move */
+			var move_x = Runtime.Math.abs(e.pageX - this.drag_start_point.get("x"));
+			var move_y = Runtime.Math.abs(e.pageY - this.drag_start_point.get("y"));
+			if (move_x < 10 && move_y < 10) return false;
+			/* Start drag */
+			this.is_drag = true;
+			this.createShadow();
+			return true;
+		},
+		/**
+		 * Stop drag & drop
+		 */
+		stopDrag: function()
+		{
+			if (!this.is_drag) return;
+			this.is_drag = false;
+			this.is_transition = false;
+			this.drag_elem = null;
+			this.drag_start_point = null;
+			this.shadow_elem.remove();
+			this.shadow_elem = null;
+		},
+		/**
+		 * Move drag & drop
+		 */
+		moveDrag: function(e)
+		{
+			if (!this.is_drag) return;
+			this.moveShadow(e.pageX, e.pageY);
+			if (this.is_transition) return;
+			var elem = this.getDragElementFromPoint(e.pageX, e.pageY);
+			if (!elem) return;
+			var pos = elem.getAttribute("data-pos");
+			if (pos == this.drag_item_pos) return;
+			/* Swap items with animation */
+			this.is_transition = true;
+			this.old_value = Runtime.Serializer.copy(this.value);
+			this.swapItems(this.drag_item_pos, pos);
+			this.drag_item_pos = pos;
+			/* Stop animation */
+			window.setTimeout(() =>
+			{
+				this.is_transition = false;
+			}, this.duration);
+			/* Send value change */
+			this.onValueChange();
+		},
+		/**
+		 * On value change
+		 */
+		onValueChange: function()
+		{
+			this.emit("valueChange", new Runtime.Web.Messages.ValueChangeMessage(Runtime.Map.create({
+				"value": this.value,
+				"old_value": this.old_value,
+				"data": this.data,
+			})));
+		},
+		/**
+		 * Add item click
+		 */
+		onAddItemClick: function()
+		{
+			var items = this.getItems();
+			if (items == null)
+			{
+				this.emit("valueChange", new Runtime.Web.Messages.ValueChangeMessage(Runtime.Map.create({
+					"value": this.createValue(),
+					"old_value": this.old_value,
+					"data": this.data,
+				})));
+			}
+			this.nextTick(() =>
+			{
+				this.old_value = Runtime.Serializer.copy(this.value);
+				var items = this.getItems();
+				items.push(this.createItem());
+				this.onValueChange();
+			});
+		},
+		/**
+		 * Mouse down
+		 */
+		onMouseDown: function(e, item)
+		{
+			if (e.button != 0) return;
+			if (this.is_drag) return;
+			/* Set start drag item */
+			this.drag_elem = this.getDragElement(e.target);
+			this.drag_item = item;
+			this.drag_item_pos = this.drag_elem.getAttribute("data-pos");
+			this.drag_start_point = Runtime.Map.create({
+				"x": e.pageX,
+				"y": e.pageY,
+				"shift_x": e.pageX - e.target.offsetLeft,
+				"shift_y": e.pageY - e.target.offsetTop,
+			});
+			/* Add event listener */
+			document.addEventListener("mouseup", this.onMouseUp);
+			document.addEventListener("mousemove", this.onMouseMove);
+			e.preventDefault();
+			return false;
+		},
+		/**
+		 * Mouse tree up
+		 */
+		onMouseUp: function(e)
+		{
+			/* Remove event listener */
+			document.removeEventListener("mouseup", this.onMouseUp);
+			document.removeEventListener("mousemove", this.onMouseMove);
+			/* Stop drag & drop */
+			this.stopDrag();
+		},
+		/**
+		 * Mouse move
+		 */
+		onMouseMove: function(e)
+		{
+			if (this.drag_elem == null) return;
+			/* Try to start drag & drop */
+			if (!this.is_drag) this.startDrag(e);
+			if (!this.is_drag) return;
+			/* Move Drag & Drop */
+			this.moveDrag(e);
+		},
+		getClassName: function(){ return "Runtime.Widget.SortableList"; },
+	},
+	getComponentStyle: function(){ return ".widget_sortable_list.h-2646{position: relative}.widget_sortable_list__item.h-2646{display: flex;align-items: center;justify-content: flex-start;border-width: var(--widget-border-width);border-color: var(--widget-color-border);border-style: solid;border-radius: 4px;margin: 5px}.widget_sortable_list__item_drag,\n.widget_sortable_list__item_remove.h-2646{cursor: pointer;padding: 0px 5px}.widget_sortable_list__item_value.h-2646{flex: 1}.widget_sortable_list__item_value.h-2646 %(Input)widget_input, %(Select)widget_select{padding: 0px 10px;border-color: transparent;border-radius: 0;border-width: 0}.widget_sortable_list__buttons.h-2646{text-align: center;margin-top: var(--widget-space)}.widget_sortable_list__shadow_elem.h-2646{position: absolute;opacity: 0.5;user-select: none;z-index: 9999999}.widget_sortable_list__shadow_elem.h-2646 .widget_sortable_list__item_drag{cursor: grabbing}.widget_sortable_list__shadow_elem.h-2646 .widget_sortable_list__item{margin: 0}.widget_sortable_list-move,\n.widget_sortable_list-enter-active,\n.widget_sortable_list-leave-active.h-2646{transition: all 0.3s ease}.widget_sortable_list-enter-from,\n.widget_sortable_list-leave-to.h-2646{opacity: 0}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector("Runtime.Widget.Button", "Runtime.Widget.Input", "Runtime.Widget.Select"); },
+};
+window["Runtime.Widget.SortableList"] = Runtime.Widget.SortableList;
+"use strict;"
+/*
+ *  BayLang Technology
+ *
+ *  (c) Copyright 2016-2024 "Ildar Bikmamatov" <support@bayrell.org>
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+*/
+if (typeof Runtime == 'undefined') Runtime = {};
+if (typeof Runtime.Widget == 'undefined') Runtime.Widget = {};
+Runtime.Widget.SortableFieldList = {
+	name: "Runtime.Widget.SortableFieldList",
+	extends: Runtime.Widget.SortableList,
+	data: function()
+	{
+		return {
+			fields: new Runtime.Vector(),
+		};
+	},
+	methods:
+	{
+		renderValueItem: function(field, pos, item)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_value_row", componentHash])}));
+			
+			/* Element div */
+			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_value_label", componentHash])}));
+			__v1.push(field.get("label"));
+			
+			/* Element div */
+			let __v2 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_value_item", componentHash])}));
+			
+			if (item)
+			{
+				var field_name = field.get("name");
+				var field_component = field.get("component");
+				var field_props = field.get("props");
+				
+				/* Element field_component */
+				__v2.element(Runtime.rtl.findClass(field_component), new Runtime.Map({"name": field_name, "value": item.get(field_name), "onValueChange": this.hash(0) ? this.hash(0) : this.hash(0, (message) =>
+				{
+					item.set(field_name, message.value);
+					this.onValueChange();
+				})}).concat(field_props));
+			}
+			
+			return __v;
+		},
+		renderValue: function(pos, item)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			for (var i = 0; i < this.fields.count(); i++)
+			{
+				var field = this.fields.get(i);
+				__v.push(this.renderValueItem(field, pos, item));
+			}
+			
+			return __v;
+		},
+		renderItem: function(pos)
+		{
+			const rs = use("Runtime.rs");
+			const componentHash = rs.getComponentHash(this.getClassName());
+			let __v = new Runtime.VirtualDom(this);
+			
+			var item = this.getItems().get(pos);
+			
+			/* Element div */
+			let __v0 = __v.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item", componentHash]), "data-pos": pos, "key": item}));
+			
+			/* Element div */
+			let __v1 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_element widget_sortable_list__item_element--drag", componentHash])}));
+			
+			/* Element div */
+			let __v2 = __v1.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_drag", componentHash]), "onMousedown": this.hash(1) ? this.hash(1) : this.hash(1, (e) =>
+			{
+				this.onMouseDown(e, item);
+			})}));
+			__v2.push("@raw");
+			__v2.push("&#9776;");
+			
+			/* Element div */
+			let __v3 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_value", componentHash])}));
+			__v3.push(this.renderValue(pos, item));
+			
+			/* Element div */
+			let __v4 = __v0.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_element widget_sortable_list__item_element--remove", componentHash])}));
+			
+			/* Element div */
+			let __v5 = __v4.element("div", new Runtime.Map({"class": rs.className(["widget_sortable_list__item_remove", componentHash]), "onClick": this.hash(2) ? this.hash(2) : this.hash(2, (e) =>
+			{
+				this.removeItem(pos);
+			})}));
+			__v5.push("@raw");
+			__v5.push("&#10005;");
+			
+			return __v;
+		},
+		/**
+		 * Create new item
+		 */
+		createItem: function(){ return new Runtime.Map(); },
+		/**
+		 * Returns drag & drop element
+		 */
+		getDragElement: function(elem)
+		{
+			if (elem.classList.contains("widget_sortable_list__item")) return elem;
+			if (elem.parentElement.classList.contains("widget_sortable_list__item"))
+			{
+				return elem.parentElement;
+			}
+			if (elem.parentElement.parentElement.classList.contains("widget_sortable_list__item"))
+			{
+				return elem.parentElement.parentElement;
+			}
+			return null;
+		},
+		getClassName: function(){ return "Runtime.Widget.SortableFieldList"; },
+	},
+	getComponentStyle: function(){ return ".widget_sortable_list__item.h-a548{align-items: stretch;margin: 10px 0px}.widget_sortable_list__item_element.h-a548{display: flex}.widget_sortable_list__item_element--drag.h-a548{align-items: center}.widget_sortable_list__item_element--remove.h-a548{align-items: start}.widget_sortable_list__item_value.h-a548{padding: 5px}.widget_sortable_list__item_value.h-a548 %(Input)widget_input, %(Select)widget_select{border-bottom: 1px var(--widget-color-border) solid;box-shadow: none;outline: none}.widget_sortable_list__item_value_row.h-a548{display: flex;align-items: center;margin-bottom: 1px}.widget_sortable_list__item_value_label.h-a548{width: 80px}.widget_sortable_list__item_value_item.h-a548{flex: 1}"; },
+	getRequiredComponents: function(){ return new Runtime.Vector("Runtime.Widget.Input", "Runtime.Widget.Select"); },
+};
+window["Runtime.Widget.SortableFieldList"] = Runtime.Widget.SortableFieldList;
 "use strict;"
 /*
  *  BayLang Technology
@@ -14034,6 +14807,8 @@ Runtime.Widget.Sortable.ItemList = {
 			this.shadow_elem = document.createElement("div");
 			this.shadow_elem.innerHTML = this.drag_elem.outerHTML;
 			this.shadow_elem.classList.add("sortable_list__shadow_elem");
+			let items = Runtime.rs.split(" ", Runtime.rs.getComponentHash(this.getClassName()));
+			for (let i = 0; i < items.count(); i++) this.shadow_elem.classList.add(items.get(i));
 			let arr = Runtime.rs.split(" ", Runtime.rs.getCssHash(this.getClassName()));
 			arr = arr.filter((item) => { return item != ""; });
 			for (let i = 0; i < arr.count(); i++)
@@ -14098,7 +14873,7 @@ Runtime.Widget.Sortable.ItemList = {
 			if (pos == this.drag_item_pos) return;
 			/* Swap items with animation */
 			this.is_transition = true;
-			this.old_value = this.copyItem(this.value);
+			this.old_value = this.value.slice();
 			this.swapItems(this.drag_item_pos, pos);
 			this.drag_item_pos = pos;
 			/* Stop animation */
@@ -14709,6 +15484,7 @@ Runtime.Widget.Table.Manager = class extends Runtime.BaseModel
 	static serialize(rules)
 	{
 		super.serialize(rules);
+		rules.addType("foreign_key", rules.params ? rules.params.get("foreign_key") : null);
 		rules.addType("form", new Runtime.Serializer.ObjectType(Runtime.Map.create({
 			"autocreate": true,
 			"extends": "Runtime.Widget.Form.FormModel",
@@ -14721,6 +15497,10 @@ Runtime.Widget.Table.Manager = class extends Runtime.BaseModel
 			"item_type": rules.params ? rules.params.get("item_type") : null,
 		})));
 		rules.addType("dialog", new Runtime.Serializer.ObjectType(Runtime.Map.create({"extends": "Runtime.Widget.Dialog.DialogModel"})));
+		rules.addType("loader", new Runtime.Serializer.ObjectType(Runtime.Map.create({
+			"extends": "Runtime.Widget.Table.TableLoader",
+			"foreign_key": rules.params ? rules.params.get("foreign_key") : null,
+		})));
 	}
 	
 	
@@ -15220,6 +16000,18 @@ if (typeof Runtime.Widget.Table == 'undefined') Runtime.Widget.Table = {};
 Runtime.Widget.Table.TableLoader = class extends Runtime.BaseModel
 {
 	/**
+	 * Serialize object
+	 */
+	static serialize(rules)
+	{
+		super.serialize(rules);
+		rules.addType("foreign_key", rules.params ? rules.params.get("foreign_key") : null);
+		rules.addType("page", new Runtime.Serializer.IntegerType());
+		rules.addType("limit", new Runtime.Serializer.IntegerType());
+	}
+	
+	
+	/**
 	 * Init params
 	 */
 	initParams(params)
@@ -15447,6 +16239,18 @@ Runtime.Widget.Table.TableWrap = {
 			if (field_name == "row_number")
 			{
 				__v.push(row_number + this.row_offset + 1);
+			}
+			else if (field.has("component"))
+			{
+				let component = field.get("component");
+				let props = field.get("props", new Runtime.Map());
+				
+				/* Element component */
+				__v.element(component, new Runtime.Map({"name": field_name, "value": item.get(field_name)}).concat(props));
+			}
+			else if (field.has("model"))
+			{
+				__v.push(this.renderWidget(field.get("model")));
 			}
 			else if (field.has("slot"))
 			{

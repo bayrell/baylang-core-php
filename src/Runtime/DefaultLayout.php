@@ -19,6 +19,7 @@
 */
 namespace Runtime;
 
+use Runtime\BaseLayout;
 use Runtime\BaseModel;
 use Runtime\VirtualDom;
 use Runtime\Hooks\RuntimeHook;
@@ -31,12 +32,22 @@ class DefaultLayout extends \Runtime\Component
 		$componentHash = \Runtime\rs::getComponentHash(static::getClassName());
 		$__v = new \Runtime\VirtualDom($this);
 		
-		$model = $this->layout->getPageModel();
-		$class_name = $model ? $model->component : "";
-		if ($class_name)
+		if ($this->layout->current_component != "")
 		{
-			/* Element $class_name */
-			$__v->element($class_name, (new \Runtime\Map(["model" => $model])));
+			$component = $this->layout->current_component;
+			
+			/* Element $component */
+			$__v->element($component, (new \Runtime\Map([]))->concat($this->layout->component_props));
+		}
+		else
+		{
+			$model = $this->layout->getPageModel();
+			$class_name = $model ? $model->component : "";
+			if ($class_name)
+			{
+				/* Element $class_name */
+				$__v->element($class_name, (new \Runtime\Map(["model" => $model])));
+			}
 		}
 		
 		return $__v;
@@ -116,7 +127,7 @@ class DefaultLayout extends \Runtime\Component
 		
 		/* Element style */
 		$__v0 = $__v->element("style");
-		$__v0->push($this->layout->getStyle());
+		$__v0->push(\Runtime\BaseLayout::getStyle($this->layout->getComponents()));
 		
 		return $__v;
 	}

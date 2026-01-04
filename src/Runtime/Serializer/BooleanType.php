@@ -56,8 +56,8 @@ class BooleanType extends \Runtime\BaseObject implements \Runtime\Serializer\Bas
 			if ($value == 1) return true;
 			return false;
 		}
-		if ($value == "true") return true;
-		if ($value == "false") return false;
+		if ($value == "true" || $value == "1") return true;
+		if ($value == "false" || $value == "0") return false;
 		$errors->push(new \Runtime\Serializer\TypeError("Does not boolean"));
 		return false;
 	}

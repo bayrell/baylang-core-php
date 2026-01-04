@@ -150,6 +150,7 @@ class ObjectType extends \Runtime\Serializer\MapType
 	function filter($value, $errors, $old_value = null, $prev = null)
 	{
 		if ($value == null) return null;
+		if ($value instanceof \Runtime\SerializeInterface) return $value;
 		$new_value = $old_value;
 		if (!$new_value)
 		{

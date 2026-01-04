@@ -49,7 +49,7 @@ class SearchApi extends \Runtime\Web\BaseApi
 	/**
 	 * Returns relation name
 	 */
-	function getRealtionName(){ return ""; }
+	function getRelationName(){ return ""; }
 	
 	
 	/**
@@ -58,7 +58,7 @@ class SearchApi extends \Runtime\Web\BaseApi
 	function __construct()
 	{
 		parent::__construct();
-		$this->relation = \Runtime\rtl::newInstance($this->getRealtionName());
+		$this->relation = \Runtime\rtl::newInstance($this->getRelationName());
 	}
 	
 	
@@ -181,12 +181,28 @@ class SearchApi extends \Runtime\Web\BaseApi
 	 */
 	function search()
 	{
+		/* Build query */
 		$q = $this->relation->select();
 		$q->limit($this->getLimit());
 		$q->page($this->getPage());
 		$q->calcFoundRows();
 		$this->buildQuery($q);
+		/* Search before */
+		$rules = $this->rules();
+		for ($i = 0; $i < $rules->count(); $i++)
+		{
+			$rule = $rules->get($i);
+			$rule->onSearchBefore($this, $q);
+		}
+		/* Search */
 		$this->items = $this->relation->fetchAll($q);
+		/* Search after */
+		$rules = $this->rules();
+		for ($i = 0; $i < $rules->count(); $i++)
+		{
+			$rule = $rules->get($i);
+			$rule->onSearchAfter($this);
+		}
 	}
 	
 	

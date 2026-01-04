@@ -20,6 +20,8 @@ namespace Runtime\Widget\Table;
 
 use Runtime\ApiResult;
 use Runtime\BaseModel;
+use Runtime\Serializer\IntegerType;
+use Runtime\Serializer\ObjectType;
 use Runtime\Web\RenderContainer;
 use Runtime\Widget\Table\TableModel;
 
@@ -33,6 +35,18 @@ class TableLoader extends \Runtime\BaseModel
 	var $page_name;
 	var $page;
 	var $limit;
+	
+	
+	/**
+	 * Serialize object
+	 */
+	static function serialize($rules)
+	{
+		parent::serialize($rules);
+		$rules->addType("foreign_key", $rules->params ? $rules->params->get("foreign_key") : null);
+		$rules->addType("page", new \Runtime\Serializer\IntegerType());
+		$rules->addType("limit", new \Runtime\Serializer\IntegerType());
+	}
 	
 	
 	/**

@@ -54,7 +54,7 @@ class SaveApi extends \Runtime\Web\BaseApi
 	/**
 	 * Returns relation name
 	 */
-	function getRealtionName(){ return ""; }
+	function getRelationName(){ return ""; }
 	
 	
 	/**
@@ -64,10 +64,10 @@ class SaveApi extends \Runtime\Web\BaseApi
 	{
 		parent::__construct();
 		/* Create relation */
-		$relation_name = $this->getRealtionName();
+		$relation_name = $this->getRelationName();
 		if ($relation_name)
 		{
-			$this->relation = \Runtime\rtl::newInstance($this->getRealtionName());
+			$this->relation = \Runtime\rtl::newInstance($this->getRelationName());
 		}
 	}
 	
@@ -100,6 +100,12 @@ class SaveApi extends \Runtime\Web\BaseApi
 	 * Convert item
 	 */
 	function convertItem($item){ return $item; }
+	
+	
+	/**
+	 * Returns save fields
+	 */
+	function getSaveFields(){ return null; }
 	
 	
 	/**
@@ -173,7 +179,7 @@ class SaveApi extends \Runtime\Web\BaseApi
 		for ($i = 0; $i < $rules->count(); $i++)
 		{
 			$item = $rules->get($i);
-			$item->filter($this->update_data, $errors);
+			$this->update_data = $item->filter($this->update_data, $errors);
 		}
 		/* Check error */
 		if ($errors->count() > 0)
@@ -209,6 +215,10 @@ class SaveApi extends \Runtime\Web\BaseApi
 	 */
 	function createItem()
 	{
+		if (!$this->relation)
+		{
+			throw new \Runtime\Exceptions\ApiError(new \Runtime\Exceptions\ItemNotFound($this->getRelationName(), "Relation"));
+		}
 		$this->item = $this->relation->createRecord();
 	}
 	
@@ -237,13 +247,43 @@ class SaveApi extends \Runtime\Web\BaseApi
 	
 	
 	/**
+	 * Before delete
+	 */
+	function onDeleteBefore(){}
+	
+	
+	/**
+	 * After delete
+	 */
+	function onDeleteAfter(){}
+	
+	
+	/**
 	 * Save item
 	 */
 	function save()
 	{
-		$this->item->assign($this->update_data);
+		/* Set items */
+		$save_fields = $this->getSaveFields();
+		$save_data = !$save_fields ? $this->update_data->copy() : $this->update_data->intersect($save_fields);
+		$this->item->assign($save_data);
+		/* Save before */
+		$rules = $this->rules();
+		for ($i = 0; $i < $rules->count(); $i++)
+		{
+			$rule = $rules->get($i);
+			$rule->onSaveBefore($this);
+		}
 		$this->onSaveBefore();
+		/* Save item */
 		$this->relation->save($this->item);
+		/* Save after */
+		$rules = $this->rules();
+		for ($i = 0; $i < $rules->count(); $i++)
+		{
+			$rule = $rules->get($i);
+			$rule->onSaveAfter($this);
+		}
 		$this->onSaveAfter();
 	}
 	
@@ -253,7 +293,24 @@ class SaveApi extends \Runtime\Web\BaseApi
 	 */
 	function delete()
 	{
+		/* Delete before */
+		$rules = $this->rules();
+		for ($i = 0; $i < $rules->count(); $i++)
+		{
+			$rule = $rules->get($i);
+			$rule->onDeleteBefore($this);
+		}
+		$this->onDeleteBefore();
+		/* Delete item */
 		$this->relation->delete($this->item);
+		/* Delete after */
+		$rules = $this->rules();
+		for ($i = 0; $i < $rules->count(); $i++)
+		{
+			$rule = $rules->get($i);
+			$rule->onDeleteAfter($this);
+		}
+		$this->onDeleteAfter();
 	}
 	
 	

@@ -23,6 +23,7 @@ use Runtime\BaseModel;
 use Runtime\Message;
 use Runtime\Method;
 use Runtime\Serializer\BaseType;
+use Runtime\Serializer\MapType;
 use Runtime\Serializer\ObjectType;
 use Runtime\Web\RenderContainer;
 use Runtime\Widget\Dialog\DialogModel;
@@ -54,6 +55,7 @@ class Manager extends \Runtime\BaseModel
 	static function serialize($rules)
 	{
 		parent::serialize($rules);
+		$rules->addType("foreign_key", $rules->params ? $rules->params->get("foreign_key") : null);
 		$rules->addType("form", new \Runtime\Serializer\ObjectType(new \Runtime\Map([
 			"autocreate" => true,
 			"extends" => "Runtime.Widget.Form.FormModel",
@@ -66,6 +68,10 @@ class Manager extends \Runtime\BaseModel
 			"item_type" => $rules->params ? $rules->params->get("item_type") : null,
 		])));
 		$rules->addType("dialog", new \Runtime\Serializer\ObjectType(new \Runtime\Map(["extends" => "Runtime.Widget.Dialog.DialogModel"])));
+		$rules->addType("loader", new \Runtime\Serializer\ObjectType(new \Runtime\Map([
+			"extends" => "Runtime.Widget.Table.TableLoader",
+			"foreign_key" => $rules->params ? $rules->params->get("foreign_key") : null,
+		])));
 	}
 	
 	

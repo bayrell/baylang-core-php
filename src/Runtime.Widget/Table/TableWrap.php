@@ -73,6 +73,18 @@ class TableWrap extends \Runtime\Component
 		{
 			$__v->push($row_number + $this->row_offset + 1);
 		}
+		else if ($field->has("component"))
+		{
+			$component = $field->get("component");
+			$props = $field->get("props", new \Runtime\Map());
+			
+			/* Element $component */
+			$__v->element($component, (new \Runtime\Map(["name" => $field_name, "value" => $item->get($field_name)]))->concat($props));
+		}
+		else if ($field->has("model"))
+		{
+			$__v->push($this->renderWidget($field->get("model")));
+		}
 		else if ($field->has("slot"))
 		{
 			$__v->push($this->renderSlot($field->get("slot"), new \Runtime\Vector($item, $field, $row_number)));

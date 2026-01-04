@@ -18,12 +18,73 @@
  */
 namespace Runtime\Widget\Api\Rules;
 
+use Runtime\BaseObject;
 use Runtime\Serializer;
+use Runtime\ORM\Query;
+use Runtime\Widget\Api\SaveApi;
+use Runtime\Widget\Api\SearchApi;
 
-interface BaseRule
+
+class BaseRule extends \Runtime\BaseObject
 {
+	/**
+	 * Create object
+	 */
+	function __construct($params)
+	{
+		parent::__construct();
+		$this->_assign_values($params);
+	}
+	
+	
 	/**
 	 * Filter data
 	 */
-	function filter($data, $errors);
+	function filter($data, $errors){ return $data; }
+	
+	
+	/**
+	 * On search before
+	 */
+	function onSearchBefore($api, $q){}
+	
+	
+	/**
+	 * On search after
+	 */
+	function onSearchAfter($api){}
+	
+	
+	/**
+	 * On save before
+	 */
+	function onSaveBefore($api){}
+	
+	
+	/**
+	 * On save after
+	 */
+	function onSaveAfter($api){}
+	
+	
+	/**
+	 * On delete before
+	 */
+	function onDeleteBefore($api){}
+	
+	
+	/**
+	 * On delete after
+	 */
+	function onDeleteAfter($api){}
+	
+	
+	/* ========= Class init functions ========= */
+	function _init()
+	{
+		parent::_init();
+	}
+	static function getClassName(){ return "Runtime.Widget.Api.Rules.BaseRule"; }
+	static function getMethodsList(){ return null; }
+	static function getMethodInfoByName($field_name){ return null; }
 }

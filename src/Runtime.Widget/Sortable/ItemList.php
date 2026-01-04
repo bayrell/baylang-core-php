@@ -229,6 +229,8 @@ class ItemList extends \Runtime\Component
 		$this->shadow_elem = $document->createElement("div");
 		$this->shadow_elem->innerHTML = $this->drag_elem->outerHTML;
 		$this->shadow_elem->classList->add("sortable_list__shadow_elem");
+		$items = \Runtime\rs::split(" ", \Runtime\rs::getComponentHash($this->getClassName()));
+		for ($i = 0; $i < $items->count(); $i++) $this->shadow_elem->classList->add($items->get($i));
 		$arr = \Runtime\rs::split(" ", \Runtime\rs::getCssHash($this->getClassName()));
 		$arr = $arr->filter(function ($item){ return $item != ""; });
 		for ($i = 0; $i < $arr->count(); $i++)
@@ -293,7 +295,7 @@ class ItemList extends \Runtime\Component
 		if ($pos == $this->drag_item_pos) return;
 		/* Swap items with animation */
 		$this->is_transition = true;
-		$this->old_value = $this->copyItem($this->value);
+		$this->old_value = $this->value->slice();
 		$this->swapItems($this->drag_item_pos, $pos);
 		$this->drag_item_pos = $pos;
 		/* Stop animation */

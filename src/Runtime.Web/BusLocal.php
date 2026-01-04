@@ -29,6 +29,7 @@ use Runtime\Web\ApiResult;
 use Runtime\Web\ApiRequest;
 use Runtime\Web\BaseApi;
 use Runtime\Web\Bus;
+use Runtime\Web\Middleware;
 use Runtime\Web\Annotations\Api;
 use Runtime\Web\Annotations\ApiMethod;
 use Runtime\Web\Hooks\AppHook;
@@ -105,6 +106,25 @@ class BusLocal extends \Runtime\BaseProvider implements \Runtime\BusInterface
 	
 	
 	/**
+	 * Run middleware
+	 */
+	function runMiddleware($api_method)
+	{
+		$api = $api_method->item->obj;
+		$items = $api->getMiddleware();
+		for ($i = 0; $i < $items->count(); $i++)
+		{
+			$item = $items->get($i);
+			$item->api($api);
+		}
+		/* Run hook */
+		\Runtime\rtl::getContext()->hook(\Runtime\Web\Hooks\AppHook::API_MIDDLEWARE, new \Runtime\Map([
+			"api" => $api,
+		]));
+	}
+	
+	
+	/**
 	 * Send api to frontend
 	 */
 	function send($params)
@@ -114,6 +134,7 @@ class BusLocal extends \Runtime\BaseProvider implements \Runtime\BusInterface
 		$result = null;
 		try
 		{
+			/* Find api */
 			$api_method = $this->findApi($api_name, $method_name);
 			if ($api_method == null || $api_method->item == null)
 			{
@@ -125,6 +146,9 @@ class BusLocal extends \Runtime\BaseProvider implements \Runtime\BusInterface
 				"storage" => $params->get("storage"),
 			]));
 			$api_method->item->obj->setRequest($request);
+			/* Run middleware */
+			$this->runMiddleware($api_method);
+			/* Apply */
 			$api_method->apply($request);
 			$result = $api_method->item->obj->result;
 		}

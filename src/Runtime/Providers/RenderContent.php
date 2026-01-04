@@ -54,7 +54,7 @@ class RenderContent extends \Runtime\BaseProvider
 	 */
 	function render($vdom, $content, $parent_vdom = null)
 	{
-		if (!$vdom) return;
+		if ($vdom === null) return;
 		if (!($vdom instanceof \Runtime\VirtualDom))
 		{
 			if ($parent_vdom && $parent_vdom->is_raw)
